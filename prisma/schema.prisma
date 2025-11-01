@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  administrator
+  operator
+  supervisor
+}
+
+model Jurisdiction {
+  id                    String                @id @default(uuid())
+  name                  String
+  neighborhoods         Neighborhood[]
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  deleted_at            DateTime?
+}
+
+model Municipal {
+  id                    String                @id @default(uuid())
+  address               String
+  camera                String
+  implementation        String?
+  ip                    String
+  latitude              Float
+  longitude             Float
+  pole                  String
+  type                  Int
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  deleted_at            DateTime?
+}
+
+model Neighborhood {
+  id                    String                @id @default(uuid())
+  address               String
+  camera_model          String
+  camera_password       String
+  camera_type           String
+  camera_username       String
+  comment               String?
+  establishment         String
+  interconnector        String?
+  jurisdiction_id       String
+  latitude              Float
+  longitude             Float
+  neighbor_name         String
+  neighbor_phone        String?
+  serial                String
+  jurisdiction          Jurisdiction          @relation(fields: [jurisdiction_id], references: [id])
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  deleted_at            DateTime?
+}
+
+model User {
+  id                    String                @id @default(uuid())
+  username              String                @unique
+  password              String
+  name                  String
+  lastname              String
+  email                 String                @unique
+  dni                   String?               @unique
+  phone                 String?               @unique
+  token                 String?
+  rol                   Rol
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  deleted_at            DateTime?
+}
