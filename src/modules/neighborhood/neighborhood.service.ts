@@ -11,7 +11,7 @@ export class NeighborhoodService {
 
   async create(dto: CreateNeighborhoodDto): Promise<Neighborhood> {
     const neighborhood = await this.prisma.neighborhood.create({
-      data: dto
+      data: dto,
     });
     return await this.getNeighborhoodById(neighborhood.id);
   }
@@ -35,7 +35,7 @@ export class NeighborhoodService {
           camera_type: true,
           comment: true,
           establishment: true,
-          jurisdiction: { select: { name: true }},
+          jurisdiction: { select: { name: true } },
           latitude: true,
           longitude: true,
           neighbor_name: true,
@@ -48,8 +48,8 @@ export class NeighborhoodService {
     );
   }
 
-  async findOne(id: string, rol?: Rol): Promise<Neighborhood> {
-    return await this.getNeighborhoodById(id, rol);
+  async findOne(id: string): Promise<Neighborhood> {
+    return await this.getNeighborhoodById(id);
   }
 
   async update(id: string, dto: UpdateNeighborhoodDto): Promise<Neighborhood> {
@@ -72,7 +72,7 @@ export class NeighborhoodService {
     });
   }
 
-  private async getNeighborhoodById(id: string, rol: Rol | null = null): Promise<any> {
+  private async getNeighborhoodById(id: string): Promise<any> {
     const select = {
       address: true,
       camera_model: true,
@@ -82,7 +82,7 @@ export class NeighborhoodService {
       comment: true,
       establishment: true,
       interconnector: false,
-      jurisdiction: { select: { name: true }},
+      jurisdiction: { select: { name: true } },
       latitude: true,
       longitude: true,
       neighbor_name: true,
@@ -90,19 +90,14 @@ export class NeighborhoodService {
       serial: false,
       deleted_at: true,
     };
-    if (rol === Rol.administrator || rol === Rol.supervisor) {
-      select.camera_password = true;
-      select.camera_username = true;
-      select.interconnector = true;
-      select.neighbor_phone = true;
-      select.serial = true;
-    }
     const neighborhood = await this.prisma.neighborhood.findUnique({
       where: { id },
       select,
     });
-    if (!neighborhood) throw new BadRequestException('Cámara vecinal no encontrada');
-    if (neighborhood.deleted_at) throw new BadRequestException('Cámara vecinal eliminada');
+    if (!neighborhood)
+      throw new BadRequestException('Cámara vecinal no encontrada');
+    if (neighborhood.deleted_at)
+      throw new BadRequestException('Cámara vecinal eliminada');
     return neighborhood;
   }
 }

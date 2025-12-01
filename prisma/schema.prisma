@@ -7,10 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Camera {
+  LPR
+  C180
+  C360
+}
+
 enum Rol {
-  administrator
-  operator
-  supervisor
+  ADMINISTRATOR
+  SUPERVISOR
+  CEPLAN
 }
 
 model Jurisdiction {
@@ -24,14 +30,14 @@ model Jurisdiction {
 
 model Municipal {
   id                    String                @id @default(uuid())
+  name                  String                @unique
   address               String
-  camera                String
-  implementation        String?
-  ip                    String
+  camera                Camera
   latitude              Float
   longitude             Float
-  pole                  String
-  type                  Int
+  geometry              Json?
+  buttom                Boolean               @default(false)
+  megaphone             Boolean               @default(false)
   created_at            DateTime              @default(now())
   updated_at            DateTime              @updatedAt
   deleted_at            DateTime?
@@ -65,7 +71,7 @@ model User {
   password              String
   name                  String
   lastname              String
-  email                 String                @unique
+  email                 String?               @unique
   dni                   String?               @unique
   phone                 String?               @unique
   token                 String?

@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto';
 import { JwtPayload } from './interfaces';
+import { timezoneHelper } from '../common/helpers';
 
 @Injectable()
 export class AuthService {
@@ -28,24 +29,26 @@ export class AuthService {
     const { id } = user;
     const token = await this.getJwtToken({ sub: id });
     await this.prisma.user.update({
-      data: { token },
+      data: {
+        token,
+        updated_at: timezoneHelper(),
+      },
       where: { id },
     });
     return {
       user: username,
+      rol: user.rol,
       token,
     };
   }
 
   async logout(user: any) {
-    const { user_id: id, username } = user;
+    const { user_id: id } = user;
     await this.prisma.user.update({
       data: { token: null },
       where: { id },
     });
-    return {
-      user: username,
-    };
+    return { success: true };
   }
 
   private getJwtToken(payload: JwtPayload) {

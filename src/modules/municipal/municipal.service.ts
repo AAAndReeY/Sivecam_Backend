@@ -1,12 +1,29 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Rol, Municipal } from '@prisma/client';
-import { CreateMunicipalDto, UpdateMunicipalDto } from './dto';
+import { Municipal } from '@prisma/client';
+import * as xlsx from 'xlsx';
+import {
+  CreateMunicipalDto,
+  FilterMunicipalDto,
+  UpdateMunicipalDto,
+} from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
-import { SearchDto } from '../../common/dto';
 
 @Injectable()
 export class MunicipalService {
+  private select = {
+    id: true,
+    name: true,
+    address: true,
+    camera: true,
+    latitude: true,
+    longitude: true,
+    buttom: true,
+    megaphone: true,
+    geometry: true,
+    deleted_at: true,
+  };
+
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateMunicipalDto): Promise<Municipal> {
@@ -16,38 +33,28 @@ export class MunicipalService {
     return await this.getMunicipalById(municipal.id);
   }
 
-  async findAll(dto: SearchDto): Promise<any> {
-    const { search, ...pagination } = dto;
-    const where: any = {  deleted_at: null };
+  async findAll(dto: FilterMunicipalDto): Promise<any> {
+    const { search, camera, ...pagination } = dto;
+    const where: any = { deleted_at: null };
+    if (camera) where.camera = camera;
     if (search)
       where.OR = [
-        { pole: { contains: search, mode: 'insensitive' } },
         { address: { contains: search, mode: 'insensitive' } },
-        { camera: { contains: search, mode: 'insensitive' } },
-        { type: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search, mode: 'insensitive' } },
       ];
     return await paginationHelper(
       this.prisma.municipal,
       {
-        select: {
-          id: true,
-          pole: true,
-          address: true,
-          camera: true,
-          implementation: true,
-          latitude: true,
-          longitude: true,
-          type: true,
-        },
+        select: this.select,
         where,
-        orderBy: { lastname: 'pole' },
+        orderBy: { name: 'asc' },
       },
       pagination,
     );
   }
 
-  async findOne(id: string, rol?: Rol): Promise<Municipal> {
-    return await this.getMunicipalById(id, rol);
+  async findOne(id: string): Promise<Municipal> {
+    return await this.getMunicipalById(id);
   }
 
   async update(id: string, dto: UpdateMunicipalDto): Promise<Municipal> {
@@ -59,37 +66,71 @@ export class MunicipalService {
     return await this.getMunicipalById(id);
   }
 
-  async delete(id: string): Promise<any> {
-    await this.getMunicipalById(id);
-    await this.prisma.municipal.update({
+  async toggleDelete(id: string): Promise<any> {
+    const user = await this.getMunicipalById(id);
+    const inactive = user.deleted_at;
+    const deleted_at = inactive ? null : timezoneHelper();
+    await this.prisma.user.update({
       data: {
         updated_at: timezoneHelper(),
-        deleted_at: timezoneHelper(),
+        deleted_at,
       },
       where: { id },
     });
+    return {
+      action: inactive ? 'Restore' : 'Delete',
+      id,
+    };
   }
 
-  private async getMunicipalById(id: string, rol: string | null = null): Promise<any> {
-    const select = {
-      address: true,
-      camera: true,
-      implementation: true,
-      ip: false,
-      latitude: true,
-      longitude: true,
-      pole: true,
-      type: true,
-      deleted_at: true,
-    };
-    if (rol === Rol.administrator || rol === Rol.supervisor)
-      select.ip = true;
+  async upload(file: Express.Multer.File) {
+    const cameras = await this.prisma.municipal.findMany();
+    if (cameras.length !== 0)
+      throw new BadRequestException('Solo se puede realizar una vez');
+    const workbook = xlsx.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+    const data = rows.map((row: any) => {
+      return {
+        name: String(row.name),
+        address: row.address,
+        camera: row.camera,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        buttom: row.buttom ? true : false,
+        megaphone: row.megaphone ? true : false,
+        created_at: timezoneHelper(),
+        updated_at: timezoneHelper(),
+      };
+    });
+    await this.prisma.municipal.createMany({ data });
+    return { success: true };
+  }
+
+  async radius(file: Express.Multer.File) {
+  const text = file.buffer.toString('utf8');
+  const cameras = JSON.parse(text);
+    for (const camera of cameras.features) {
+      await this.prisma.municipal.update({
+        data: {
+          geometry: camera?.geometry,
+          updated_at: timezoneHelper()
+        },
+        where: { name: camera?.properties?.name }
+      });
+    }
+    return { success: true };
+  }
+
+  private async getMunicipalById(id: string): Promise<any> {
     const municipal = await this.prisma.municipal.findUnique({
       where: { id },
-      select,
+      select: this.select,
     });
-    if (!municipal) throw new BadRequestException('Cámara municipal no encontrada');
-    if (municipal.deleted_at) throw new BadRequestException('Cámara municipal eliminada');
+    if (!municipal)
+      throw new BadRequestException('Cámara municipal no encontrada');
+    if (municipal.deleted_at)
+      throw new BadRequestException('Cámara municipal eliminada');
     return municipal;
   }
 }

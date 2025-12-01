@@ -1,5 +1,7 @@
+import { Rol } from '@prisma/client';
 import {
   IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -36,8 +38,8 @@ export class CreateUserDto {
   lastname: string;
 
   @IsEmail()
-  @IsNotEmpty()
-  email: string;
+  @IsOptional()
+  email?: string;
 
   @Matches(/^[0-9]{8}$/)
   @IsOptional()
@@ -46,4 +48,7 @@ export class CreateUserDto {
   @Matches(/^[0-9]{9}$/)
   @IsOptional()
   phone?: string;
+
+  @IsEnum(Rol)
+  rol: Rol;
 }

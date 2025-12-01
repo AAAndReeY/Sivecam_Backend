@@ -10,30 +10,29 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { UserService } from '../user/user.service';
-import { CreateUserDto, UpdateUserDto } from '../user/dto';
+import { UserService } from './user.service';
+import { CreateUserDto, FilterUserDto, UpdateUserDto } from './dto';
 import { JwtAuthGuard, Roles, RolesGuard } from '../../auth/guard';
-import { SearchDto } from '../../common/dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('administrator', 'supervisor')
-@Controller('operator')
-export class OperatorController {
+@Roles('ADMINISTRATOR')
+@Controller('user')
+export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post()
   create(@Body() dto: CreateUserDto) {
-    return this.userService.create(dto, 'operator');
+    return this.userService.create(dto);
   }
 
   @Get()
-  findAll(@Query() dto: SearchDto) {
-    return this.userService.findAll(dto, 'operator');
+  findAll(@Query() dto: FilterUserDto) {
+    return this.userService.findAll(dto);
   }
 
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.userService.findOne(id, 'operator');
+    return this.userService.findOne(id);
   }
 
   @Patch(':id')
@@ -43,6 +42,6 @@ export class OperatorController {
 
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string) {
-    return this.userService.delete(id);
+    return this.userService.toggleDelete(id);
   }
 }

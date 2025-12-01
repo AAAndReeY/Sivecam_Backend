@@ -1,18 +1,15 @@
-import { IsString, IsOptional, IsNumber } from 'class-validator';
+import { Camera } from '@prisma/client';
+import { IsString, IsNumber, IsEnum, IsBoolean } from 'class-validator';
 
 export class CreateMunicipalDto {
   @IsString()
+  name: string;
+
+  @IsString()
   address: string;
 
-  @IsString()
-  camera: string;
-
-  @IsOptional()
-  @IsString()
-  implementation?: string;
-
-  @IsString()
-  ip: string;
+  @IsEnum(Camera)
+  camera: Camera;
 
   @IsNumber()
   latitude: number;
@@ -20,9 +17,9 @@ export class CreateMunicipalDto {
   @IsNumber()
   longitude: number;
 
-  @IsString()
-  pole: string;
+  @IsBoolean()
+  buttom: boolean;
 
-  @IsNumber()
-  type: number;
+  @IsBoolean()
+  megaphone: boolean;
 }
