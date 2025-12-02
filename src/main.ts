@@ -1,5 +1,5 @@
 import { NestFactory, Reflector } from '@nestjs/core';
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import {
@@ -20,6 +20,12 @@ async function bootstrap() {
   app.useGlobalInterceptors(
     new PrismaExceptionInterceptor(),
     new ResponseInterceptor(reflector),
+  );
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+    }),
   );
   app.setGlobalPrefix('api');
   const config = app.get(ConfigService);

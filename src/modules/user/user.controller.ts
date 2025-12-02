@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, FilterUserDto, UpdateUserDto } from './dto';
-import { JwtAuthGuard, Roles, RolesGuard } from '../../auth/guard';
+import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMINISTRATOR')

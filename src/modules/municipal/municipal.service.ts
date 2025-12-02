@@ -108,15 +108,15 @@ export class MunicipalService {
   }
 
   async radius(file: Express.Multer.File) {
-  const text = file.buffer.toString('utf8');
-  const cameras = JSON.parse(text);
+    const text = file.buffer.toString('utf8');
+    const cameras = JSON.parse(text);
     for (const camera of cameras.features) {
       await this.prisma.municipal.update({
         data: {
           geometry: camera?.geometry,
-          updated_at: timezoneHelper()
+          updated_at: timezoneHelper(),
         },
-        where: { name: camera?.properties?.name }
+        where: { name: camera?.properties?.name },
       });
     }
     return { success: true };

@@ -12,14 +12,14 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { MunicipalService } from './municipal.service';
 import {
   CreateMunicipalDto,
   FilterMunicipalDto,
   UpdateMunicipalDto,
 } from './dto';
-import { JwtAuthGuard, Roles, RolesGuard } from '../../auth/guard';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMINISTRATOR')

@@ -1,0 +1,24 @@
+export const SQL_SHIFT_CASE = `
+  CASE
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 6 AND 13 THEN 1
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 14 AND 21 THEN 2
+    ELSE 3
+  END
+`;
+
+export const SQL_SCHEDULE_CASE = `
+  CASE
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 0 AND 1 THEN 1
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 2 AND 3 THEN 2
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 4 AND 5 THEN 3
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 6 AND 7 THEN 4
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 8 AND 9 THEN 5
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 10 AND 11 THEN 6
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 12 AND 13 THEN 7
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 14 AND 15 THEN 8
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 16 AND 17 THEN 9
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 18 AND 19 THEN 10
+    WHEN DATEPART(HOUR, hora_ocurrencia) BETWEEN 20 AND 21 THEN 11
+    ELSE 12
+  END
+`;

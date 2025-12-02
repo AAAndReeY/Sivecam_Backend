@@ -65,6 +65,18 @@ model Neighborhood {
   deleted_at            DateTime?
 }
 
+model Typology {
+  id                    String                @id @default(uuid())
+  name                  String
+  map_id                Int
+  incidence_id          Int
+  case_type             String
+  case_subtype          String
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  deleted_at            DateTime?
+}
+
 model User {
   id                    String                @id @default(uuid())
   username              String                @unique
