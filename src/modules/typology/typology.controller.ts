@@ -12,16 +12,17 @@ import { TypologyService } from './typology.service';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMINISTRATOR')
 @Controller('typology')
 export class TypologyController {
   constructor(private readonly typologyService: TypologyService) {}
 
+  @Roles('ADMINISTRATOR', 'SUPERVISOR')
   @Get(':id')
   findByMapId(@Param('id') id: string) {
     return this.typologyService.findByMapId(+id);
   }
 
+  @Roles('ADMINISTRATOR')
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   upload(@UploadedFile() file: Express.Multer.File) {

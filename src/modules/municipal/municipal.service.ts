@@ -7,34 +7,25 @@ import {
   UpdateMunicipalDto,
 } from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { paginationHelper, timezoneHelper } from '../../common/helpers';
+import { timezoneHelper } from '../../common/helpers';
 
 @Injectable()
 export class MunicipalService {
-  private select = {
-    id: true,
-    name: true,
-    address: true,
-    camera: true,
-    latitude: true,
-    longitude: true,
-    buttom: true,
-    megaphone: true,
-    geometry: true,
-    deleted_at: true,
-  };
-
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateMunicipalDto): Promise<Municipal> {
     const municipal = await this.prisma.municipal.create({
-      data: dto,
+      data: {
+        ...dto,
+        created_at: timezoneHelper(),
+        updated_at: timezoneHelper(),
+      },
     });
     return await this.getMunicipalById(municipal.id);
   }
 
   async findAll(dto: FilterMunicipalDto): Promise<any> {
-    const { search, camera, ...pagination } = dto;
+    const { search, camera } = dto;
     const where: any = { deleted_at: null };
     if (camera) where.camera = camera;
     if (search)
@@ -42,15 +33,14 @@ export class MunicipalService {
         { address: { contains: search, mode: 'insensitive' } },
         { name: { contains: search, mode: 'insensitive' } },
       ];
-    return await paginationHelper(
-      this.prisma.municipal,
-      {
-        select: this.select,
-        where,
-        orderBy: { name: 'asc' },
-      },
-      pagination,
-    );
+    const municipal = await this.prisma.municipal.findMany({
+      where,
+      orderBy: { name: 'asc' },
+    });
+    return {
+      count: municipal.length,
+      data: municipal,
+    };
   }
 
   async findOne(id: string): Promise<Municipal> {
@@ -60,17 +50,20 @@ export class MunicipalService {
   async update(id: string, dto: UpdateMunicipalDto): Promise<Municipal> {
     await this.getMunicipalById(id);
     await this.prisma.municipal.update({
-      data: dto,
+      data: {
+        ...dto,
+        updated_at: timezoneHelper(),
+      },
       where: { id },
     });
     return await this.getMunicipalById(id);
   }
 
   async toggleDelete(id: string): Promise<any> {
-    const user = await this.getMunicipalById(id);
-    const inactive = user.deleted_at;
+    const municipal = await this.getMunicipalById(id, true);
+    const inactive = municipal.deleted_at;
     const deleted_at = inactive ? null : timezoneHelper();
-    await this.prisma.user.update({
+    await this.prisma.municipal.update({
       data: {
         updated_at: timezoneHelper(),
         deleted_at,
@@ -84,8 +77,8 @@ export class MunicipalService {
   }
 
   async upload(file: Express.Multer.File) {
-    const cameras = await this.prisma.municipal.findMany();
-    if (cameras.length !== 0)
+    const municipal = await this.prisma.municipal.findMany();
+    if (municipal.length !== 0)
       throw new BadRequestException('Solo se puede realizar una vez');
     const workbook = xlsx.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
@@ -109,8 +102,8 @@ export class MunicipalService {
 
   async radius(file: Express.Multer.File) {
     const text = file.buffer.toString('utf8');
-    const cameras = JSON.parse(text);
-    for (const camera of cameras.features) {
+    const municipal = JSON.parse(text);
+    for (const camera of municipal.features) {
       await this.prisma.municipal.update({
         data: {
           geometry: camera?.geometry,
@@ -122,14 +115,13 @@ export class MunicipalService {
     return { success: true };
   }
 
-  private async getMunicipalById(id: string): Promise<any> {
+  private async getMunicipalById(id: string, toogle: boolean = false): Promise<any> {
     const municipal = await this.prisma.municipal.findUnique({
       where: { id },
-      select: this.select,
     });
     if (!municipal)
       throw new BadRequestException('Cámara municipal no encontrada');
-    if (municipal.deleted_at)
+    if (municipal.deleted_at && !toogle)
       throw new BadRequestException('Cámara municipal eliminada');
     return municipal;
   }

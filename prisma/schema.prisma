@@ -7,22 +7,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Brand {
+  DAHUA
+  HIKVISION
+}
+
 enum Camera {
   LPR
   C180
   C360
 }
 
+enum Mode {
+  FIXED
+  DOME
+  BOTH
+}
+
 enum Rol {
   ADMINISTRATOR
   SUPERVISOR
-  CEPLAN
+  OPERATOR
 }
 
 model Jurisdiction {
   id                    String                @id @default(uuid())
   name                  String
-  neighborhoods         Neighborhood[]
   created_at            DateTime              @default(now())
   updated_at            DateTime              @updatedAt
   deleted_at            DateTime?
@@ -43,23 +53,14 @@ model Municipal {
   deleted_at            DateTime?
 }
 
-model Neighborhood {
+model Communal {
   id                    String                @id @default(uuid())
   address               String
-  camera_model          String
-  camera_password       String
-  camera_type           String
-  camera_username       String
-  comment               String?
-  establishment         String
-  interconnector        String?
-  jurisdiction_id       String
+  brand                 Brand
+  mode                  Mode
+  neighbor              String
   latitude              Float
   longitude             Float
-  neighbor_name         String
-  neighbor_phone        String?
-  serial                String
-  jurisdiction          Jurisdiction          @relation(fields: [jurisdiction_id], references: [id])
   created_at            DateTime              @default(now())
   updated_at            DateTime              @updatedAt
   deleted_at            DateTime?

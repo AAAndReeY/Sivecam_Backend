@@ -4,7 +4,7 @@ import { FilterIncidenceDto } from './dto';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMINISTRATOR', 'SUPERVISOR', 'CEPLAN')
+@Roles('ADMINISTRATOR', 'SUPERVISOR')
 @Controller('incidence')
 export class IncidenceController {
   constructor(private readonly incidenceService: IncidenceService) {}

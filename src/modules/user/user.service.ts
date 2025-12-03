@@ -8,6 +8,7 @@ import { paginationHelper, timezoneHelper } from '../../common/helpers';
 @Injectable()
 export class UserService {
   private select = {
+    id: true,
     name: true,
     lastname: true,
     username: true,
@@ -64,10 +65,10 @@ export class UserService {
     const data = password
       ? {
           password: bcrypt.hashSync(password, 10),
-          update_at: timezoneHelper(),
+          updated_at: timezoneHelper(),
           ...res,
         }
-      : { update_at: timezoneHelper(), ...res };
+      : { updated_at: timezoneHelper(), ...res };
     await this.prisma.user.update({
       data,
       where: { id },
@@ -76,7 +77,7 @@ export class UserService {
   }
 
   async toggleDelete(id: string): Promise<any> {
-    const user = await this.getUserById(id);
+    const user = await this.getUserById(id, true);
     const inactive = user.deleted_at;
     const deleted_at = inactive ? null : timezoneHelper();
     await this.prisma.user.update({
@@ -92,13 +93,13 @@ export class UserService {
     };
   }
 
-  private async getUserById(id: string): Promise<any> {
+  private async getUserById(id: string, toogle: boolean = false): Promise<any> {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: this.select,
     });
     if (!user) throw new BadRequestException('Usuario no encontrado');
-    if (user.deleted_at) throw new BadRequestException('Usuario eliminado');
+    if (user.deleted_at && !toogle) throw new BadRequestException('Usuario eliminado');
     return user;
   }
 }

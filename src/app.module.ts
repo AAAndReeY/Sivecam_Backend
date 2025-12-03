@@ -4,9 +4,9 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CommunalModule } from './modules/communal/communal.module';
 import { IncidenceModule } from './modules/incidence/incidence.module';
 import { MunicipalModule } from './modules/municipal/municipal.module';
-import { NeighborhoodModule } from './modules/neighborhood/neighborhood.module';
 import { SqlModule } from './modules/sql/sql.module';
 import { TypologyModule } from './modules/typology/typology.module';
 import { UserModule } from './modules/user/user.module';
@@ -18,9 +18,9 @@ import { UserModule } from './modules/user/user.module';
     }),
     PrismaModule,
     AuthModule,
+    CommunalModule,
     IncidenceModule,
     MunicipalModule,
-    NeighborhoodModule,
     SqlModule,
     TypologyModule,
     UserModule,
