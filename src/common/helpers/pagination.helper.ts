@@ -14,7 +14,7 @@ export async function paginationHelper<T>(
   pagination: PaginationQuery,
 ): Promise<PaginatedResult<T>> {
   const { page = 1, limit = 10 } = pagination;
-  if (page === 0) {
+  if (page == 0) {
     const data = await model.findMany(args);
     const totalCount = data.length;
     return {

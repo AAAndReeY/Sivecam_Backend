@@ -1,5 +1,7 @@
+import { Rol } from '@prisma/client';
 import {
   IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -17,7 +19,7 @@ export class CreateUserDto {
   @IsNotEmpty()
   @MinLength(8)
   @MaxLength(20)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[$%&#]).+$/, {
+  @Matches(/^(?=.*[a-z])(?=.*\d)(?=.*[$%&#]).+$/, {
     message:
       'The password must include at least one uppercase letter, one lowercase letter, one number, and one special character: $, %, &, or #',
   })
@@ -36,8 +38,8 @@ export class CreateUserDto {
   lastname: string;
 
   @IsEmail()
-  @IsNotEmpty()
-  email: string;
+  @IsOptional()
+  email?: string;
 
   @Matches(/^[0-9]{8}$/)
   @IsOptional()
@@ -46,4 +48,7 @@ export class CreateUserDto {
   @Matches(/^[0-9]{9}$/)
   @IsOptional()
   phone?: string;
+
+  @IsEnum(Rol)
+  rol: Rol;
 }

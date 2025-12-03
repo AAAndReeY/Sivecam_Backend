@@ -1,18 +1,23 @@
-import { IsString, IsOptional, IsNumber } from 'class-validator';
+import { Camera } from '@prisma/client';
+import { JsonObject } from '@prisma/client/runtime/library';
+import {
+  IsString,
+  IsNumber,
+  IsEnum,
+  IsBoolean,
+  IsJSON,
+  IsOptional,
+} from 'class-validator';
 
 export class CreateMunicipalDto {
   @IsString()
+  name: string;
+
+  @IsString()
   address: string;
 
-  @IsString()
-  camera: string;
-
-  @IsOptional()
-  @IsString()
-  implementation?: string;
-
-  @IsString()
-  ip: string;
+  @IsEnum(Camera)
+  camera: Camera;
 
   @IsNumber()
   latitude: number;
@@ -20,9 +25,15 @@ export class CreateMunicipalDto {
   @IsNumber()
   longitude: number;
 
-  @IsString()
-  pole: string;
+  @IsBoolean()
+  @IsOptional()
+  buttom?: boolean;
 
-  @IsNumber()
-  type: number;
+  @IsBoolean()
+  @IsOptional()
+  megaphone?: boolean;
+
+  @IsJSON()
+  @IsOptional()
+  geometry?: JsonObject;
 }

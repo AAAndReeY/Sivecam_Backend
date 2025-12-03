@@ -1,98 +1,147 @@
 <p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+  <a href="https://web.munisjl.gob.pe/web/" target="blank">
+    <img src="./client/logo.png" width="320" alt="MDSJL" />
+  </a>
+  <br>
+  <img src="https://img.shields.io/badge/Sistema-SGC-2D6A80?style=for-the-badge&logo=government&logoColor=white">
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
+<h3 align="center">Sistema de Gestión de Cámaras</h3>
+<p align="center">
+  <em>Sistema de Gestión de Cámaras de la Central de Control y Monitoreo de la Municipalidad de San Juan de Lurigancho</em>
 </p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-## Description
+<p align="center">
+  <a href="https://www.munisanjuan.gob.pe" target="_blank">
+    <img src="https://img.shields.io/badge/Institución-MDSJL-0077B6?style=flat-square&logo=government&logoColor=white">
+  </a>
+  <a href="LICENSE" target="_blank">
+    <img src="https://img.shields.io/badge/Licencia-Municipal-blueviolet?style=flat-square">
+  </a>
+</p>
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 📘 Descripción
 
-## Project setup
+Este repositorio contiene el backend del Sistema de Gestión de Cámaras (SGC), desarrollado por el equipo de desarrolladores de la Central de Control y  Monitoreo de la Municipalidad de San Juan de Lurigancho.
 
-```bash
-$ yarn install
-```
+El sistema está construido utilizando el framework  [NestJS](https://github.com/nestjs/nest), bajo una arquitectura modular que facilita el mantenimiento y escalabilidad del proyecto.
 
-## Compile and run the project
+Permite gestionar las cámaras, así como la obtención de la ubicación de las incidencias más urgentes.
 
-```bash
-# development
-$ yarn run start
+---
 
-# watch mode
-$ yarn run start:dev
+## 🔑 Características principales
 
-# production mode
-$ yarn run start:prod
-```
+- Registro y gestión de cámaras
+- Asignación de roles
+- Visualización de incidencias
+- Filtros destacados
 
-## Run tests
+---
 
-```bash
-# unit tests
-$ yarn run test
+## ⚙️ Configuración del Proyecto
 
-# e2e tests
-$ yarn run test:e2e
-
-# test coverage
-$ yarn run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 1️⃣ Instalar dependencias
 
 ```bash
-$ yarn install -g mau
-$ mau deploy
+yarn install
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Instala todos los paquetes definidos en `package.json`, incluyendo NestJS, Prisma, y otras dependencias esenciales.
 
-## Resources
+---
 
-Check out a few resources that may come in handy when working with NestJS:
+### 2️⃣ Configurar variables de entorno
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Renombra el archivo `.env.template` a `.env` y completa las variables necesarias:
 
-## Support
+```bash
+cp .env.template .env
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+> ⚠️ Asegúrate de que la variable `DATABASE_URL` esté bien definida según tu entorno.
 
-## Stay in touch
+---
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### 3️⃣ Configurar Prisma
 
-## License
+```bash
+npx prisma generate
+npx prisma db push
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- `prisma generate`: Genera el cliente Prisma basado en `schema.prisma`.
+- `prisma db push`: Sincroniza tu esquema con la base de datos (sin usar migraciones).
+
+---
+
+### 4️⃣ Ejecutar el servidor
+
+```bash
+# Modo desarrollo
+yarn start:dev
+
+# Modo normal
+yarn start
+
+# Modo producción
+yarn start:prod
+```
+
+---
+
+## 🚀 Deployment
+
+Para desplegar este proyecto, ten en cuenta lo siguiente:
+
+### 📦 Requisitos mínimos en producción
+
+- Node.js 18+
+- PostgreSQL 12+
+- PM2, Docker o servicio equivalente para manejar procesos
+- Variables de entorno correctamente configuradas (`.env`)
+- Prisma Client generado (`npx prisma generate`)
+- Esquema sincronizado con la BD (`npx prisma db push` o `migrate deploy` si usas migraciones)
+
+---
+
+### 🔧 Pasos básicos para producción
+
+```bash
+# Instalar dependencias sin devDependencies
+yarn install
+
+# Generar Prisma Client
+npx prisma generate
+
+# Sincronizar con la base de datos
+npx prisma db push
+
+# Ejecutar en modo producción
+yarn build
+```
+
+> También puedes usar `PM2`, `Docker` o `Nginx` como proxy inverso para manejar procesos y despliegue continuo.
+
+---
+
+## 🛠 Soporte Técnico
+
+El equipo de desarrollo encargado del backend del Sistema de Gestión de Cámaras está conformado por:
+
+- **Eduardo Villegas** – Backend Developer – [![LinkedIn](https://img.shields.io/badge/-LinkedIn-0077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/eduardo-enrique-villegas-bojorquez/)
+
+---
+
+
+## 📄 Licencia
+
+El sistema backend utiliza el framework **NestJS** bajo la Licencia MIT.
+
+---
+
+<p align="center">
+  <sub>Desarrollado por el equipo de desarrollo de la Central de Comunicaciones de la Municipalidad de San Juan de Lurigancho</sub>
+  <br>
+  <img src="./client/logo.png" width="320" alt="MDSJL" />
+</p>

@@ -7,16 +7,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Brand {
+  DAHUA
+  HIKVISION
+}
+
+enum Camera {
+  LPR
+  C180
+  C360
+}
+
+enum Mode {
+  FIXED
+  DOME
+  BOTH
+}
+
 enum Rol {
-  administrator
-  operator
-  supervisor
+  ADMINISTRATOR
+  SUPERVISOR
+  OPERATOR
 }
 
 model Jurisdiction {
   id                    String                @id @default(uuid())
   name                  String
-  neighborhoods         Neighborhood[]
   created_at            DateTime              @default(now())
   updated_at            DateTime              @updatedAt
   deleted_at            DateTime?
@@ -24,36 +40,39 @@ model Jurisdiction {
 
 model Municipal {
   id                    String                @id @default(uuid())
+  name                  String                @unique
   address               String
-  camera                String
-  implementation        String?
-  ip                    String
+  camera                Camera
   latitude              Float
   longitude             Float
-  pole                  String
-  type                  Int
+  geometry              Json?
+  buttom                Boolean               @default(false)
+  megaphone             Boolean               @default(false)
   created_at            DateTime              @default(now())
   updated_at            DateTime              @updatedAt
   deleted_at            DateTime?
 }
 
-model Neighborhood {
+model Communal {
   id                    String                @id @default(uuid())
   address               String
-  camera_model          String
-  camera_password       String
-  camera_type           String
-  camera_username       String
-  comment               String?
-  establishment         String
-  interconnector        String?
-  jurisdiction_id       String
+  brand                 Brand
+  mode                  Mode
+  neighbor              String
   latitude              Float
   longitude             Float
-  neighbor_name         String
-  neighbor_phone        String?
-  serial                String
-  jurisdiction          Jurisdiction          @relation(fields: [jurisdiction_id], references: [id])
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  deleted_at            DateTime?
+}
+
+model Typology {
+  id                    String                @id @default(uuid())
+  name                  String
+  map_id                Int
+  incidence_id          Int
+  case_type             String
+  case_subtype          String
   created_at            DateTime              @default(now())
   updated_at            DateTime              @updatedAt
   deleted_at            DateTime?
@@ -65,7 +84,7 @@ model User {
   password              String
   name                  String
   lastname              String
-  email                 String                @unique
+  email                 String?               @unique
   dni                   String?               @unique
   phone                 String?               @unique
   token                 String?
