@@ -7,7 +7,7 @@ import {
   UpdateMunicipalDto,
 } from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { timezoneHelper } from '../../common/helpers';
+import { paginationHelper, timezoneHelper } from '../../common/helpers';
 
 @Injectable()
 export class MunicipalService {
@@ -25,7 +25,7 @@ export class MunicipalService {
   }
 
   async findAll(dto: FilterMunicipalDto): Promise<any> {
-    const { search, camera } = dto;
+    const { search, camera, ...pagination } = dto;
     const where: any = { deleted_at: null };
     if (camera) where.camera = camera;
     if (search)
@@ -33,14 +33,14 @@ export class MunicipalService {
         { address: { contains: search, mode: 'insensitive' } },
         { name: { contains: search, mode: 'insensitive' } },
       ];
-    const municipal = await this.prisma.municipal.findMany({
-      where,
-      orderBy: { name: 'asc' },
-    });
-    return {
-      count: municipal.length,
-      data: municipal,
-    };
+    return paginationHelper(
+      this.prisma.municipal,
+      {
+        where,
+        orderBy: { name: 'asc' },
+      },
+      pagination,
+    );
   }
 
   async findOne(id: string): Promise<Municipal> {
@@ -106,7 +106,7 @@ export class MunicipalService {
     for (const camera of municipal.features) {
       await this.prisma.municipal.update({
         data: {
-          geometry: camera?.geometry,
+          //geometry: camera?.geometry,
           updated_at: timezoneHelper(),
         },
         where: { name: camera?.properties?.name },
@@ -115,7 +115,25 @@ export class MunicipalService {
     return { success: true };
   }
 
-  private async getMunicipalById(id: string, toogle: boolean = false): Promise<any> {
+  async angle(file: Express.Multer.File) {
+    const text = file.buffer.toString('utf8');
+    const municipal = JSON.parse(text);
+    for (const camera of municipal.features) {
+      await this.prisma.municipal.update({
+        data: {
+          angle: camera?.geometry.angle,
+          updated_at: timezoneHelper(),
+        },
+        where: { name: camera?.properties?.name },
+      });
+    }
+    return { success: true };
+  }
+
+  private async getMunicipalById(
+    id: string,
+    toogle: boolean = false,
+  ): Promise<any> {
     const municipal = await this.prisma.municipal.findUnique({
       where: { id },
     });

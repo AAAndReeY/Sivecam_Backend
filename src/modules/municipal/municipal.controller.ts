@@ -58,7 +58,6 @@ export class MunicipalController {
     return this.municipalService.toggleDelete(id);
   }
 
-
   @Roles('ADMINISTRATOR')
   @Post('upload')
   @SuccessMessage('Creación masiva exitosa')
@@ -73,5 +72,13 @@ export class MunicipalController {
   @SuccessMessage('Actualización masiva exitosa')
   radius(@UploadedFile() file: Express.Multer.File) {
     return this.municipalService.radius(file);
+  }
+
+  @Roles('ADMINISTRATOR')
+  @Post('angle')
+  @UseInterceptors(FileInterceptor('file'))
+  @SuccessMessage('Actualización masiva exitosa')
+  angle(@UploadedFile() file: Express.Multer.File) {
+    return this.municipalService.angle(file);
   }
 }

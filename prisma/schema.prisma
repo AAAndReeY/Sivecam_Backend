@@ -18,6 +18,11 @@ enum Camera {
   C360
 }
 
+enum Color {
+  GREEN
+  YELLOW
+}
+
 enum Mode {
   FIXED
   DOME
@@ -28,6 +33,17 @@ enum Rol {
   ADMINISTRATOR
   SUPERVISOR
   OPERATOR
+}
+
+model Defense {
+  id                    String                @id @default(uuid())
+  address               String
+  place                 String
+  latitude              Float
+  longitude             Float
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  deleted_at            DateTime?
 }
 
 model Jurisdiction {
@@ -45,7 +61,8 @@ model Municipal {
   camera                Camera
   latitude              Float
   longitude             Float
-  geometry              Json?
+  angle                 Float?
+  radius                Float?
   buttom                Boolean               @default(false)
   megaphone             Boolean               @default(false)
   created_at            DateTime              @default(now())
@@ -78,6 +95,29 @@ model Typology {
   deleted_at            DateTime?
 }
 
+model Stop {
+  id                    String                @id @default(uuid())
+  name                  String
+  address               String
+  latitude              Float
+  longitude             Float
+  authorized            Boolean               @default(false)
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  deleted_at            DateTime?
+}
+
+model Sustenance {
+  id                    String                @id @default(uuid())
+  name                  String
+  address               String
+  latitude              Float
+  longitude             Float
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  deleted_at            DateTime?
+}
+
 model User {
   id                    String                @id @default(uuid())
   username              String                @unique
@@ -89,6 +129,17 @@ model User {
   phone                 String?               @unique
   token                 String?
   rol                   Rol
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  deleted_at            DateTime?
+}
+
+model Waste {
+  id                    String                @id @default(uuid())
+  name                  String
+  latitude              Float
+  longitude             Float
+  color                 Color                 @default(GREEN)
   created_at            DateTime              @default(now())
   updated_at            DateTime              @updatedAt
   deleted_at            DateTime?
