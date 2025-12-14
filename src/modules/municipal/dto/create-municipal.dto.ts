@@ -30,4 +30,12 @@ export class CreateMunicipalDto {
   @IsBoolean()
   @IsOptional()
   megaphone?: boolean;
+
+  @IsNumber()
+  @IsOptional()
+  angle?: number;
+
+  @IsNumber()
+  @IsOptional()
+  radius?: number;
 }

@@ -13,6 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Rol } from '@prisma/client';
 import { WasteService } from './waste.service';
 import { CreateWasteDto, FilterWasteDto, UpdateWasteDto } from './dto';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
@@ -33,32 +34,29 @@ export class WasteController {
     return this.wasteService.findOne(id);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Post()
   create(@Body() dto: CreateWasteDto) {
     return this.wasteService.create(dto);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateWasteDto) {
     return this.wasteService.update(id, dto);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string) {
     return this.wasteService.toggleDelete(id);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Post('upload')
   @SuccessMessage('Creación masiva exitosa')
   @UseInterceptors(FileInterceptor('file'))
-  upload(
-    @UploadedFile() file: Express.Multer.File,
-    @Body() dto: { authorized: string },
-  ) {
+  upload(@UploadedFile() file: Express.Multer.File) {
     return this.wasteService.upload(file);
   }
 }

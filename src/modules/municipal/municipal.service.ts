@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Municipal } from '@prisma/client';
+import { Municipal, Rol } from '@prisma/client';
 import * as xlsx from 'xlsx';
 import {
   CreateMunicipalDto,
@@ -24,10 +24,11 @@ export class MunicipalService {
     return await this.getMunicipalById(municipal.id);
   }
 
-  async findAll(dto: FilterMunicipalDto): Promise<any> {
+  async findAll(dto: FilterMunicipalDto, user: any): Promise<any> {
+    const { rol } = user;
     const { search, camera, ...pagination } = dto;
     const where: any = { deleted_at: null };
-    if (camera) where.camera = camera;
+    if (camera && rol !== Rol.VIEWER) where.camera = camera;
     if (search)
       where.OR = [
         { address: { contains: search, mode: 'insensitive' } },
@@ -38,13 +39,27 @@ export class MunicipalService {
       {
         where,
         orderBy: { name: 'asc' },
+        ...(rol === Rol.VIEWER && {
+          select: {
+            name: true,
+            address: true,
+            latitude: true,
+            longitude: true,
+          },
+        }),
       },
       pagination,
     );
   }
 
-  async findOne(id: string): Promise<Municipal> {
-    return await this.getMunicipalById(id);
+  async findOne(id: string, user: any): Promise<any> {
+    const { rol } = user;
+    const municipal = await this.getMunicipalById(id);
+    if (rol !== Rol.VIEWER) return municipal;
+    return {
+      name: municipal.name,
+      address: municipal.address,
+    };
   }
 
   async update(id: string, dto: UpdateMunicipalDto): Promise<Municipal> {
@@ -97,21 +112,6 @@ export class MunicipalService {
       };
     });
     await this.prisma.municipal.createMany({ data });
-    return { success: true };
-  }
-
-  async radius(file: Express.Multer.File) {
-    const text = file.buffer.toString('utf8');
-    const municipal = JSON.parse(text);
-    for (const camera of municipal.features) {
-      await this.prisma.municipal.update({
-        data: {
-          //geometry: camera?.geometry,
-          updated_at: timezoneHelper(),
-        },
-        where: { name: camera?.properties?.name },
-      });
-    }
     return { success: true };
   }
 

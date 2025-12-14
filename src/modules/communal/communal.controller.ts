@@ -13,6 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Rol } from '@prisma/client';
 import { CommunalService } from './communal.service';
 import { CreateCommunalDto, FilterCommunalDto, UpdateCommunalDto } from './dto';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
@@ -33,13 +34,13 @@ export class CommunalController {
     return this.communalService.findOne(id);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Post()
   create(@Body() dto: CreateCommunalDto) {
     return this.communalService.create(dto);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -48,13 +49,13 @@ export class CommunalController {
     return this.communalService.update(id, dto);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Delete(':id')
   toggleDelete(@Param('id', ParseUUIDPipe) id: string) {
     return this.communalService.toggleDelete(id);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Post('upload')
   @SuccessMessage('Creación masiva exitosa')
   @UseInterceptors(FileInterceptor('file'))

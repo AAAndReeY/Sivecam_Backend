@@ -33,6 +33,7 @@ enum Rol {
   ADMINISTRATOR
   SUPERVISOR
   OPERATOR
+  VIEWER
 }
 
 model Defense {

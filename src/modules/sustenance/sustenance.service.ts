@@ -91,11 +91,15 @@ export class SustenanceService {
     return { success: true };
   }
 
-  private async getSustenanceById(id: string, toogle: boolean = false): Promise<any> {
+  private async getSustenanceById(
+    id: string,
+    toogle: boolean = false,
+  ): Promise<any> {
     const sustenance = await this.prisma.sustenance.findUnique({
       where: { id },
     });
-    if (!sustenance) throw new BadRequestException('Sostenimiento no encontrado');
+    if (!sustenance)
+      throw new BadRequestException('Sostenimiento no encontrado');
     if (sustenance.deleted_at && !toogle)
       throw new BadRequestException('Sostenimiento eliminado');
     return sustenance;

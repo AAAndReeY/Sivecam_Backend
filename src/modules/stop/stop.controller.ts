@@ -13,6 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Rol } from '@prisma/client';
 import { StopService } from './stop.service';
 import { CreateStopDto, FilterStopDto, UpdateStopDto } from './dto';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
@@ -33,25 +34,25 @@ export class StopController {
     return this.stopService.findOne(id);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Post()
   create(@Body() dto: CreateStopDto) {
     return this.stopService.create(dto);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateStopDto) {
     return this.stopService.update(id, dto);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string) {
     return this.stopService.toggleDelete(id);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Post('upload')
   @SuccessMessage('Creación masiva exitosa')
   @UseInterceptors(FileInterceptor('file'))

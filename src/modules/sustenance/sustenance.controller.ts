@@ -13,6 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Rol } from '@prisma/client';
 import { SustenanceService } from './sustenance.service';
 import { CreateSustenanceDto, UpdateSustenanceDto } from './dto';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
@@ -34,13 +35,13 @@ export class SustenanceController {
     return this.sustenanceService.findOne(id);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Post()
   create(@Body() dto: CreateSustenanceDto) {
     return this.sustenanceService.create(dto);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -49,13 +50,13 @@ export class SustenanceController {
     return this.sustenanceService.update(id, dto);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string) {
     return this.sustenanceService.toggleDelete(id);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Post('upload')
   @SuccessMessage('Creación masiva exitosa')
   @UseInterceptors(FileInterceptor('file'))

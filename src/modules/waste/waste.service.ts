@@ -24,9 +24,7 @@ export class WasteService {
     const where: any = { deleted_at: null };
     if (color) where.color = color;
     if (search)
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-      ];
+      where.OR = [{ name: { contains: search, mode: 'insensitive' } }];
     return paginationHelper(
       this.prisma.waste,
       {
