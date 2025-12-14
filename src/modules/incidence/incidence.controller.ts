@@ -1,10 +1,11 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Rol } from '@prisma/client';
 import { IncidenceService } from './incidence.service';
 import { FilterIncidenceDto } from './dto';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMINISTRATOR', 'SUPERVISOR')
+@Roles(Rol.ADMINISTRATOR, Rol.SUPERVISOR)
 @Controller('incidence')
 export class IncidenceController {
   constructor(private readonly incidenceService: IncidenceService) {}

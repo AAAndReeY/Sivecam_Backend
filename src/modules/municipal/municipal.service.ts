@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Municipal } from '@prisma/client';
+import { Municipal, Rol } from '@prisma/client';
 import * as xlsx from 'xlsx';
 import {
   CreateMunicipalDto,
@@ -7,7 +7,7 @@ import {
   UpdateMunicipalDto,
 } from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { timezoneHelper } from '../../common/helpers';
+import { paginationHelper, timezoneHelper } from '../../common/helpers';
 
 @Injectable()
 export class MunicipalService {
@@ -24,27 +24,42 @@ export class MunicipalService {
     return await this.getMunicipalById(municipal.id);
   }
 
-  async findAll(dto: FilterMunicipalDto): Promise<any> {
-    const { search, camera } = dto;
+  async findAll(dto: FilterMunicipalDto, user: any): Promise<any> {
+    const { rol } = user;
+    const { search, camera, ...pagination } = dto;
     const where: any = { deleted_at: null };
-    if (camera) where.camera = camera;
+    if (camera && rol !== Rol.VIEWER) where.camera = camera;
     if (search)
       where.OR = [
         { address: { contains: search, mode: 'insensitive' } },
         { name: { contains: search, mode: 'insensitive' } },
       ];
-    const municipal = await this.prisma.municipal.findMany({
-      where,
-      orderBy: { name: 'asc' },
-    });
-    return {
-      count: municipal.length,
-      data: municipal,
-    };
+    return paginationHelper(
+      this.prisma.municipal,
+      {
+        where,
+        orderBy: { name: 'asc' },
+        ...(rol === Rol.VIEWER && {
+          select: {
+            name: true,
+            address: true,
+            latitude: true,
+            longitude: true,
+          },
+        }),
+      },
+      pagination,
+    );
   }
 
-  async findOne(id: string): Promise<Municipal> {
-    return await this.getMunicipalById(id);
+  async findOne(id: string, user: any): Promise<any> {
+    const { rol } = user;
+    const municipal = await this.getMunicipalById(id);
+    if (rol !== Rol.VIEWER) return municipal;
+    return {
+      name: municipal.name,
+      address: municipal.address,
+    };
   }
 
   async update(id: string, dto: UpdateMunicipalDto): Promise<Municipal> {
@@ -100,13 +115,13 @@ export class MunicipalService {
     return { success: true };
   }
 
-  async radius(file: Express.Multer.File) {
+  async angle(file: Express.Multer.File) {
     const text = file.buffer.toString('utf8');
     const municipal = JSON.parse(text);
     for (const camera of municipal.features) {
       await this.prisma.municipal.update({
         data: {
-          geometry: camera?.geometry,
+          angle: camera?.geometry.angle,
           updated_at: timezoneHelper(),
         },
         where: { name: camera?.properties?.name },
@@ -115,7 +130,10 @@ export class MunicipalService {
     return { success: true };
   }
 
-  private async getMunicipalById(id: string, toogle: boolean = false): Promise<any> {
+  private async getMunicipalById(
+    id: string,
+    toogle: boolean = false,
+  ): Promise<any> {
     const municipal = await this.prisma.municipal.findUnique({
       where: { id },
     });

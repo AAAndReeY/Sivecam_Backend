@@ -14,45 +14,46 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Rol } from '@prisma/client';
-import { CommunalService } from './communal.service';
-import { CreateCommunalDto, FilterCommunalDto, UpdateCommunalDto } from './dto';
+import { SustenanceService } from './sustenance.service';
+import { CreateSustenanceDto, UpdateSustenanceDto } from './dto';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
 import { SuccessMessage } from '../auth/decorators';
+import { SearchDto } from '../../common/dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Controller('communal')
-export class CommunalController {
-  constructor(private readonly communalService: CommunalService) {}
+@Controller('sustenance')
+export class SustenanceController {
+  constructor(private readonly sustenanceService: SustenanceService) {}
 
   @Get()
-  findAll(@Query() dto: FilterCommunalDto) {
-    return this.communalService.findAll(dto);
+  findAll(@Query() dto: SearchDto) {
+    return this.sustenanceService.findAll(dto);
   }
 
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.communalService.findOne(id);
+    return this.sustenanceService.findOne(id);
   }
 
   @Roles(Rol.ADMINISTRATOR)
   @Post()
-  create(@Body() dto: CreateCommunalDto) {
-    return this.communalService.create(dto);
+  create(@Body() dto: CreateSustenanceDto) {
+    return this.sustenanceService.create(dto);
   }
 
   @Roles(Rol.ADMINISTRATOR)
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateCommunalDto,
+    @Body() dto: UpdateSustenanceDto,
   ) {
-    return this.communalService.update(id, dto);
+    return this.sustenanceService.update(id, dto);
   }
 
   @Roles(Rol.ADMINISTRATOR)
   @Delete(':id')
-  toggleDelete(@Param('id', ParseUUIDPipe) id: string) {
-    return this.communalService.toggleDelete(id);
+  delete(@Param('id', ParseUUIDPipe) id: string) {
+    return this.sustenanceService.toggleDelete(id);
   }
 
   @Roles(Rol.ADMINISTRATOR)
@@ -60,6 +61,6 @@ export class CommunalController {
   @SuccessMessage('Creación masiva exitosa')
   @UseInterceptors(FileInterceptor('file'))
   upload(@UploadedFile() file: Express.Multer.File) {
-    return this.communalService.upload(file);
+    return this.sustenanceService.upload(file);
   }
 }

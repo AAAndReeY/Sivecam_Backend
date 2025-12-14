@@ -10,12 +10,13 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Rol } from '@prisma/client';
 import { UserService } from './user.service';
 import { CreateUserDto, FilterUserDto, UpdateUserDto } from './dto';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMINISTRATOR')
+@Roles(Rol.ADMINISTRATOR)
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}

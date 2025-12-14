@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Communal } from '@prisma/client';
 import { CreateCommunalDto, FilterCommunalDto, UpdateCommunalDto } from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { timezoneHelper } from '../../common/helpers';
+import { paginationHelper, timezoneHelper } from '../../common/helpers';
 import { getBrand, getMode } from './helpers';
 
 @Injectable()
@@ -21,7 +21,7 @@ export class CommunalService {
   }
 
   async findAll(dto: FilterCommunalDto): Promise<any> {
-    const { search, brand, mode } = dto;
+    const { search, brand, mode, ...pagination } = dto;
     const where: any = { deleted_at: null };
     if (brand) where.brand = brand;
     if (mode) where.mode = mode;
@@ -30,14 +30,14 @@ export class CommunalService {
         { address: { contains: search, mode: 'insensitive' } },
         { neighbor: { contains: search, mode: 'insensitive' } },
       ];
-    const communal = await this.prisma.communal.findMany({
-      where,
-      orderBy: { neighbor: 'asc' },
-    });
-    return {
-      count: communal.length,
-      data: communal,
-    };
+    return paginationHelper(
+      this.prisma.communal,
+      {
+        where,
+        orderBy: { neighbor: 'asc' },
+      },
+      pagination,
+    );
   }
 
   async findOne(id: string): Promise<Communal> {
@@ -97,7 +97,10 @@ export class CommunalService {
     return { success: true };
   }
 
-  private async getCommunalById(id: string, toogle: boolean = false): Promise<any> {
+  private async getCommunalById(
+    id: string,
+    toogle: boolean = false,
+  ): Promise<any> {
     const communal = await this.prisma.communal.findUnique({
       where: { id },
     });

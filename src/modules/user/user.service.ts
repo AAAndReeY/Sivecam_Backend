@@ -99,7 +99,8 @@ export class UserService {
       select: this.select,
     });
     if (!user) throw new BadRequestException('Usuario no encontrado');
-    if (user.deleted_at && !toogle) throw new BadRequestException('Usuario eliminado');
+    if (user.deleted_at && !toogle)
+      throw new BadRequestException('Usuario eliminado');
     return user;
   }
 }

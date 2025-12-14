@@ -1,11 +1,9 @@
 import { Camera } from '@prisma/client';
-import { JsonObject } from '@prisma/client/runtime/library';
 import {
   IsString,
   IsNumber,
   IsEnum,
   IsBoolean,
-  IsJSON,
   IsOptional,
 } from 'class-validator';
 
@@ -33,7 +31,11 @@ export class CreateMunicipalDto {
   @IsOptional()
   megaphone?: boolean;
 
-  @IsJSON()
+  @IsNumber()
   @IsOptional()
-  geometry?: JsonObject;
+  angle?: number;
+
+  @IsNumber()
+  @IsOptional()
+  radius?: number;
 }

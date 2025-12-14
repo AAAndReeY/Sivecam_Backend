@@ -11,8 +11,10 @@ import {
   UseGuards,
   UploadedFile,
   UseInterceptors,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Rol } from '@prisma/client';
 import { MunicipalService } from './municipal.service';
 import {
   CreateMunicipalDto,
@@ -21,29 +23,32 @@ import {
 } from './dto';
 import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
 import { SuccessMessage } from '../auth/decorators';
+import { Request } from 'express';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('municipal')
 export class MunicipalController {
   constructor(private readonly municipalService: MunicipalService) {}
 
+  @Roles(Rol.ADMINISTRATOR, Rol.OPERATOR, Rol.SUPERVISOR, Rol.VIEWER)
   @Get()
-  findAll(@Query() dto: FilterMunicipalDto) {
-    return this.municipalService.findAll(dto);
+  findAll(@Query() dto: FilterMunicipalDto, @Req() req: Request) {
+    return this.municipalService.findAll(dto, req.user);
   }
 
+  @Roles(Rol.ADMINISTRATOR, Rol.OPERATOR, Rol.SUPERVISOR, Rol.VIEWER)
   @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.municipalService.findOne(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.municipalService.findOne(id, req.user);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Post()
   create(@Body() dto: CreateMunicipalDto) {
     return this.municipalService.create(dto);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -52,14 +57,13 @@ export class MunicipalController {
     return this.municipalService.update(id, dto);
   }
 
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string) {
     return this.municipalService.toggleDelete(id);
   }
 
-
-  @Roles('ADMINISTRATOR')
+  @Roles(Rol.ADMINISTRATOR)
   @Post('upload')
   @SuccessMessage('Creación masiva exitosa')
   @UseInterceptors(FileInterceptor('file'))
@@ -67,11 +71,11 @@ export class MunicipalController {
     return this.municipalService.upload(file);
   }
 
-  @Roles('ADMINISTRATOR')
-  @Post('radius')
+  @Roles(Rol.ADMINISTRATOR)
+  @Post('angle')
   @UseInterceptors(FileInterceptor('file'))
   @SuccessMessage('Actualización masiva exitosa')
-  radius(@UploadedFile() file: Express.Multer.File) {
-    return this.municipalService.radius(file);
+  angle(@UploadedFile() file: Express.Multer.File) {
+    return this.municipalService.angle(file);
   }
 }
