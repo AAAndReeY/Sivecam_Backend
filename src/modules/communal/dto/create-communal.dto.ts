@@ -1,5 +1,5 @@
 import { Brand, Mode } from '@prisma/client';
-import { IsString, IsNumber, IsEnum } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsOptional } from 'class-validator';
 
 export class CreateCommunalDto {
   @IsString()
@@ -19,4 +19,16 @@ export class CreateCommunalDto {
 
   @IsNumber()
   longitude: number;
+
+  @IsString()
+  @IsOptional()
+  user?: string;
+
+  @IsString()
+  @IsOptional()
+  password?: string;
+
+  @IsString()
+  @IsOptional()
+  serial?: string;
 }
