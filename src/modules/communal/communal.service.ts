@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Communal } from '@prisma/client';
+import * as xlsx from 'xlsx';
 import { CreateCommunalDto, FilterCommunalDto, UpdateCommunalDto } from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
@@ -73,29 +74,31 @@ export class CommunalService {
     };
   }
 
-  async upload(file: Express.Multer.File) {
-    const communal = await this.prisma.communal.findMany();
-    if (communal.length !== 0)
-      throw new BadRequestException('Solo se puede realizar una vez');
-    const text = file.buffer.toString('utf8');
-    const { features } = JSON.parse(text);
-    const data = features.map((feat: any) => {
-      const coordinates = feat.geometry.coordinates;
-      const properties = feat.properties;
-      return {
-        address: properties.ubicacion,
-        brand: getBrand(properties.marca),
-        mode: getMode(properties.tipo),
-        neighbor: properties.nombre.trim(),
-        latitude: coordinates[1],
-        longitude: coordinates[0],
-        created_at: timezoneHelper(),
-        updated_at: timezoneHelper(),
-      };
-    });
-    await this.prisma.communal.createMany({ data });
-    return { success: true };
-  }
+    async upload(file: Express.Multer.File) {
+      const communal = await this.prisma.municipal.findMany();
+      /* if (communal.length !== 0)
+        throw new BadRequestException('Solo se puede realizar una vez'); */
+      const workbook = xlsx.read(file.buffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+      const data = rows.map((row: any) => {
+        return {
+          address: row.address,
+          brand: row.brand,
+          mode: row.mode,
+          neighbor: row.neighbor,
+          latitude: parseFloat(row.latitude),
+          longitude: parseFloat(row.longitude),
+          user: row.user ?? null,
+          password: row.password ?? null,
+          serial: row.serial ?? null,
+          created_at: timezoneHelper(),
+          updated_at: timezoneHelper(),
+        };
+      });
+      await this.prisma.communal.createMany({ data });
+      return { success: true };
+    }
 
   private async getCommunalById(
     id: string,
