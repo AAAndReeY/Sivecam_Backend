@@ -74,31 +74,31 @@ export class CommunalService {
     };
   }
 
-    async upload(file: Express.Multer.File) {
-      const communal = await this.prisma.municipal.findMany();
-      if (communal.length !== 0)
-        throw new BadRequestException('Solo se puede realizar una vez');
-      const workbook = xlsx.read(file.buffer, { type: 'buffer' });
-      const sheetName = workbook.SheetNames[0];
-      const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
-      const data = rows.map((row: any) => {
-        return {
-          address: row.address,
-          brand: row.brand,
-          mode: row.mode,
-          neighbor: row.neighbor,
-          latitude: parseFloat(row.latitude),
-          longitude: parseFloat(row.longitude),
-          user: row.user ?? null,
-          password: row.password ?? null,
-          serial: row.serial ?? null,
-          created_at: timezoneHelper(),
-          updated_at: timezoneHelper(),
-        };
-      });
-      await this.prisma.communal.createMany({ data });
-      return { success: true };
-    }
+  async upload(file: Express.Multer.File) {
+    const communal = await this.prisma.municipal.findMany();
+    if (communal.length !== 0)
+      throw new BadRequestException('Solo se puede realizar una vez');
+    const workbook = xlsx.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+    const data = rows.map((row: any) => {
+      return {
+        address: row.address,
+        brand: row.brand,
+        mode: row.mode,
+        neighbor: row.neighbor,
+        latitude: parseFloat(row.latitude),
+        longitude: parseFloat(row.longitude),
+        user: row.user ?? null,
+        password: row.password ? String(String(row.password)) : null,
+        serial: row.serial ?? null,
+        created_at: timezoneHelper(),
+        updated_at: timezoneHelper(),
+      };
+    });
+    await this.prisma.communal.createMany({ data });
+    return { success: true };
+  }
 
   private async getCommunalById(
     id: string,
