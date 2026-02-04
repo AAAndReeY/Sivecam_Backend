@@ -14,6 +14,7 @@ import { UserModule } from './modules/user/user.module';
 import { WasteModule } from './modules/waste/waste.module';
 import { DefenseModule } from './modules/defense/defense.module';
 import { SustenanceModule } from './modules/sustenance/sustenance.module';
+import { ActivityModule } from './modules/activity/activity.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { SustenanceModule } from './modules/sustenance/sustenance.module';
     WasteModule,
     DefenseModule,
     SustenanceModule,
+    ActivityModule,
   ],
   controllers: [AppController],
   providers: [AppService],
