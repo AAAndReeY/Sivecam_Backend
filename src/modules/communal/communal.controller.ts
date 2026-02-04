@@ -24,11 +24,13 @@ import { SuccessMessage } from '../auth/decorators';
 export class CommunalController {
   constructor(private readonly communalService: CommunalService) {}
 
+  @Roles(Rol.ADMINISTRATOR, Rol.CODISEC, Rol.OPERATOR, Rol.SUPERVISOR)
   @Get()
   findAll(@Query() dto: FilterCommunalDto) {
     return this.communalService.findAll(dto);
   }
 
+  @Roles(Rol.ADMINISTRATOR, Rol.CODISEC, Rol.OPERATOR, Rol.SUPERVISOR)
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.communalService.findOne(id);
