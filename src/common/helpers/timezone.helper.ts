@@ -15,3 +15,27 @@ export function timezoneHelper(): Date {
   const [hh, mm, ss] = timePart.split(':').map(Number);
   return new Date(Date.UTC(y, m - 1, d, hh, mm, ss));
 }
+
+export function parseStringDate(date: string): Date {
+  const [y, m, d] = date.split('-').map(Number);
+  if (!y || !m || !d) throw new Error(`Formato de fecha inválido: ${date}`);
+  return new Date(Date.UTC(y, m - 1, d, 5, 0, 0));
+}
+
+export function parseNumberDate(serial: number): Date {
+  const epoch = 25569;
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const utcMs = (serial - epoch) * msPerDay;
+  const date = new Date(utcMs);
+  return new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      0,
+      0,
+      0,
+      0,
+    ),
+  );
+}

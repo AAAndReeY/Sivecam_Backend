@@ -31,9 +31,25 @@ enum Mode {
 
 enum Rol {
   ADMINISTRATOR
+  CODISEC
   SUPERVISOR
   OPERATOR
   VIEWER
+}
+
+model Activity {
+  id                    String                @id @default(uuid())
+  address               String?
+  description           String
+  act_type              String
+  representative        String?
+  observation           String?
+  latitude              Float
+  longitude             Float
+  done_at               DateTime
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  deleted_at            DateTime?
 }
 
 model Defense {
