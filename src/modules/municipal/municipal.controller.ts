@@ -30,13 +30,13 @@ import { Request } from 'express';
 export class MunicipalController {
   constructor(private readonly municipalService: MunicipalService) {}
 
-  @Roles(Rol.ADMINISTRATOR, Rol.OPERATOR, Rol.SUPERVISOR, Rol.VIEWER)
+  @Roles(Rol.ADMINISTRATOR, Rol.CODISEC, Rol.OPERATOR, Rol.SUPERVISOR, Rol.VIEWER)
   @Get()
   findAll(@Query() dto: FilterMunicipalDto, @Req() req: Request) {
     return this.municipalService.findAll(dto, req.user);
   }
 
-  @Roles(Rol.ADMINISTRATOR, Rol.OPERATOR, Rol.SUPERVISOR, Rol.VIEWER)
+  @Roles(Rol.ADMINISTRATOR, Rol.CODISEC, Rol.OPERATOR, Rol.SUPERVISOR, Rol.VIEWER)
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     return this.municipalService.findOne(id, req.user);
