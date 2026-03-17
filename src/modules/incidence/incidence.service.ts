@@ -8,7 +8,7 @@ export class IncidenceService {
 
   async findAll(dto: FilterIncidenceDto) {
     const { start, end, type, jurisdiction } = dto;
-    const params: Record<string, any> = { start, end, type };
+    const params: Record<string, any> = { start, end };
 
     // Obtener subtipos del tipo solicitado
     const subtipos = await this.sql.query<{ id: number }>(
