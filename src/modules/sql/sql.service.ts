@@ -1,45 +1,41 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as sql from 'mssql';
+import { Pool } from 'pg';
 
 @Injectable()
 export class SqlService implements OnModuleDestroy {
-  private pool: sql.ConnectionPool | null = null;
+  private pool: Pool | null = null;
 
   constructor(private readonly config: ConfigService) {}
 
-  async connect() {
+  private getPool(): Pool {
     if (this.pool) return this.pool;
-    this.pool = await new sql.ConnectionPool({
-      user: this.config.getOrThrow<string>('SQL_USER'),
-      password: this.config.getOrThrow<string>('SQL_PASSWORD'),
-      server: this.config.getOrThrow<string>('SQL_HOST'),
-      database: this.config.getOrThrow<string>('SQL_DATABASE'),
-      port: Number(this.config.getOrThrow<number>('SQL_PORT')),
-      options: {
-        encrypt: false,
-        trustServerCertificate: true,
-      },
-    }).connect();
+    this.pool = new Pool({
+      connectionString: this.config.getOrThrow<string>('SQL_DATABASE_URL'),
+    });
     return this.pool;
   }
+
   async query<T = any>(
     query: string,
     params?: Record<string, any>,
   ): Promise<T[]> {
-    const pool = await this.connect();
-    const request = pool.request();
-    if (params)
-      Object.entries(params).forEach(([key, value]) => {
-        request.input(key, value);
+    const pool = this.getPool();
+    let text = query;
+    const values: any[] = [];
+    if (params) {
+      Object.entries(params).forEach(([key, value], index) => {
+        text = text.replace(new RegExp(`@${key}`, 'g'), `$${index + 1}`);
+        values.push(value);
       });
-    const result = await request.query(query);
-    return result.recordset;
+    }
+    const result = await pool.query(text, values);
+    return result.rows as T[];
   }
 
   async onModuleDestroy() {
-    if (!this.pool) return this.pool;
-    await this.pool.close();
+    if (!this.pool) return;
+    await this.pool.end();
     this.pool = null;
   }
 }
