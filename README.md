@@ -129,8 +129,8 @@ yarn build
 
 El equipo de desarrollo encargado del backend del Sistema de Gestión de Cámaras está conformado por:
 
-- **Eduardo Villegas** – Backend Developer – [![LinkedIn](https://img.shields.io/badge/-LinkedIn-0077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/eduardo-enrique-villegas-bojorquez/)
-
+- **Eduardo Villegas** – Backend Developer
+- **Andre Yauri** – Backend Developer
 ---
 
 
