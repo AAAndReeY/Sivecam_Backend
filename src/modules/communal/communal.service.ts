@@ -92,6 +92,7 @@ export class CommunalService {
         user: row.user ?? null,
         password: row.password ? String(String(row.password)) : null,
         serial: row.serial ?? null,
+        phone: row.phone ?? null,
         created_at: timezoneHelper(),
         updated_at: timezoneHelper(),
       };

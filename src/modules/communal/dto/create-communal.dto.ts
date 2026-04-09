@@ -31,4 +31,7 @@ export class CreateCommunalDto {
   @IsString()
   @IsOptional()
   serial?: string;
+
+  @IsString()
+  phone?: string;
 }
