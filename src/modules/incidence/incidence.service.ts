@@ -78,7 +78,7 @@ export class IncidenceService {
         j.nombre AS "jurisdiccionNombre"
       FROM incidencias i
       LEFT JOIN jurisdicciones j ON i."jurisdiccionId" = j.id
-      WHERE i."ocurridoEn" BETWEEN @start AND @end
+      WHERE (i."ocurridoEn" AT TIME ZONE 'America/Lima')::date BETWEEN @start::date AND @end::date
         AND i."subTipoCasoId" IN (${subtipoIds})
         ${whereExtra}
     `;
