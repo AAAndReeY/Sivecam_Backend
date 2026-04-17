@@ -15,18 +15,21 @@ export class IncidenceService {
   constructor(private readonly sql: SqlService) {}
 
   async findAll(dto: FilterIncidenceDto) {
-    const { start, end, type, jurisdiction, shift: shiftFilter, schedule: scheduleFilter } = dto;
+    const { start, end, type, jurisdiction, shift: shiftFilter, schedule: scheduleFilter, subtype } = dto;
     const params: Record<string, any> = { start, end };
 
-    // Obtener subtipos del tipo solicitado
-    const subtipos = await this.sql.query<{ id: number }>(
-      `SELECT id FROM sub_tipo_casos WHERE "tipoCasoId" = @type AND habilitado = true`,
-      { type },
-    );
+    let subtipoIds: string;
 
-    if (!subtipos.length) return { count: 0, data: [] };
-
-    const subtipoIds = subtipos.map((s) => s.id).join(',');
+    if (subtype) {
+      subtipoIds = String(subtype);
+    } else {
+      const subtipos = await this.sql.query<{ id: number }>(
+        `SELECT id FROM sub_tipo_casos WHERE "tipoCasoId" = @type AND habilitado = true`,
+        { type },
+      );
+      if (!subtipos.length) return { count: 0, data: [] };
+      subtipoIds = subtipos.map((s) => s.id).join(',');
+    }
 
     let whereExtra = '';
     if (jurisdiction) {
