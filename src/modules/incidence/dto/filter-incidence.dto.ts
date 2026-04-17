@@ -1,4 +1,4 @@
-import { IsDateString, IsNumber, IsOptional } from 'class-validator';
+import { IsDateString, IsInt, IsNumber, IsOptional, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class FilterIncidenceDto {
@@ -26,4 +26,10 @@ export class FilterIncidenceDto {
   @IsNumber()
   @IsOptional()
   shift?: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  subtype?: number;
 }
