@@ -15,6 +15,8 @@ import { WasteModule } from './modules/waste/waste.module';
 import { DefenseModule } from './modules/defense/defense.module';
 import { SustenanceModule } from './modules/sustenance/sustenance.module';
 import { ActivityModule } from './modules/activity/activity.module';
+import { PnpIncidenceModule } from './modules/pnp-incidence/pnp-incidence.module';
+import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { ActivityModule } from './modules/activity/activity.module';
     DefenseModule,
     SustenanceModule,
     ActivityModule,
+    PnpIncidenceModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],
