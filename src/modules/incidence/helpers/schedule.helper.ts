@@ -1,5 +1,5 @@
 export const getScheduleFromTime = (date: Date): number => {
-  const hour = Number(date.toISOString().split('T')[1].split(':')[0]);
+  const hour = new Date(date.toLocaleString('en-US', { timeZone: 'America/Lima' })).getHours();
   if (hour <= 1) return 1;
   if (hour <= 3) return 2;
   if (hour <= 5) return 3;
