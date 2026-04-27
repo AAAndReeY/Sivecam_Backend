@@ -31,11 +31,25 @@ enum Mode {
 }
 
 enum Rol {
+  SUPERADMIN
   ADMINISTRATOR
   CODISEC
   SUPERVISOR
   OPERATOR
   VIEWER
+  PNP
+}
+
+enum Shift {
+  MORNING
+  AFTERNOON
+  NIGHT
+}
+
+enum CaseStatus {
+  INVESTIGATING
+  REFERRED
+  CLOSED
 }
 
 model Activity {
@@ -156,6 +170,23 @@ model User {
   deleted_at            DateTime?
 }
 
+model PnpIncidence {
+  id               String      @id @default(uuid())
+  description      String
+  incidence_type   String
+  latitude         Float
+  longitude        Float
+  jurisdiction     String
+  shift            Shift
+  complaint_number String?
+  police_station   String
+  case_status      CaseStatus  @default(INVESTIGATING)
+  occurred_at      DateTime
+  created_at       DateTime    @default(now())
+  updated_at       DateTime    @updatedAt
+  deleted_at       DateTime?
+}
+
 model Waste {
   id                    String                @id @default(uuid())
   name                  String
@@ -165,4 +196,14 @@ model Waste {
   created_at            DateTime              @default(now())
   updated_at            DateTime              @updatedAt
   deleted_at            DateTime?
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  action       String
+  entity       String
+  entity_id    String
+  changes      Json?
+  performed_by String?
+  created_at   DateTime @default(now())
 }
