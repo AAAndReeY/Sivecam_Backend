@@ -13,14 +13,14 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Rol } from '@prisma/client';
 import { SustenanceService } from './sustenance.service';
 import { CreateSustenanceDto, UpdateSustenanceDto } from './dto';
-import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
+import { JwtAuthGuard, CustomRoleGuard, LayerKey, ModuleOp } from '../auth/guard';
 import { SuccessMessage } from '../auth/decorators';
 import { SearchDto } from '../../common/dto';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, CustomRoleGuard)
+@LayerKey('sostenimiento')
 @Controller('sustenance')
 export class SustenanceController {
   constructor(private readonly sustenanceService: SustenanceService) {}
@@ -35,13 +35,13 @@ export class SustenanceController {
     return this.sustenanceService.findOne(id);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('create')
   @Post()
   create(@Body() dto: CreateSustenanceDto) {
     return this.sustenanceService.create(dto);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('edit')
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -50,13 +50,13 @@ export class SustenanceController {
     return this.sustenanceService.update(id, dto);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('delete')
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string) {
     return this.sustenanceService.toggleDelete(id);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('create')
   @Post('upload')
   @SuccessMessage('Creación masiva exitosa')
   @UseInterceptors(FileInterceptor('file'))

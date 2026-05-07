@@ -11,20 +11,19 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { Rol } from '@prisma/client';
 import { UserService } from './user.service';
 import { CreateUserDto, FilterUserDto, UpdateUserDto } from './dto';
-import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
+import { JwtAuthGuard, CustomRoleGuard, ModuleKey } from '../auth/guard';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Rol.SUPERADMIN)
+@UseGuards(JwtAuthGuard, CustomRoleGuard)
+@ModuleKey('usuarios')
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post()
   create(@Body() dto: CreateUserDto, @Request() req) {
-    return this.userService.create(dto, { rol: req.user.rol, username: req.user.username });
+    return this.userService.create(dto, { system_slug: req.user.system_slug, username: req.user.username });
   }
 
   @Get()
@@ -39,11 +38,11 @@ export class UserController {
 
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserDto, @Request() req) {
-    return this.userService.update(id, dto, { rol: req.user.rol, username: req.user.username });
+    return this.userService.update(id, dto, { system_slug: req.user.system_slug, username: req.user.username });
   }
 
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string, @Request() req) {
-    return this.userService.toggleDelete(id, { rol: req.user.rol, username: req.user.username });
+    return this.userService.toggleDelete(id, { system_slug: req.user.system_slug, username: req.user.username });
   }
 }

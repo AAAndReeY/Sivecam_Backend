@@ -6,6 +6,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
 import { getBrand, getMode } from './helpers';
 
+// Campos siempre incluidos: necesarios para el mapa (brand e id requeridos por iconos y filtros)
+const ALWAYS_INCLUDE = ['id', 'latitude', 'longitude', 'brand', 'deleted_at', 'created_at', 'updated_at'];
+
 @Injectable()
 export class CommunalService {
   constructor(private readonly prisma: PrismaService) {}
@@ -21,7 +24,7 @@ export class CommunalService {
     return await this.getCommunalById(communal.id);
   }
 
-  async findAll(dto: FilterCommunalDto): Promise<any> {
+  async findAll(dto: FilterCommunalDto, user: any): Promise<any> {
     const { search, brand, mode, ...pagination } = dto;
     const where: any = { deleted_at: null };
     if (brand) where.brand = brand;
@@ -31,18 +34,42 @@ export class CommunalService {
         { address: { contains: search, mode: 'insensitive' } },
         { neighbor: { contains: search, mode: 'insensitive' } },
       ];
-    return paginationHelper(
+    const result = await paginationHelper(
       this.prisma.communal,
-      {
-        where,
-        orderBy: { neighbor: 'asc' },
-      },
+      { where, orderBy: { neighbor: 'asc' } },
       pagination,
     );
+    const visibleFields = await this.getVisibleFields(user);
+    if (visibleFields) {
+      result.data = result.data.map((item: any) => this.applyFieldFilter(item, visibleFields));
+    }
+    return result;
   }
 
-  async findOne(id: string): Promise<Communal> {
-    return await this.getCommunalById(id);
+  async findOne(id: string, user: any): Promise<any> {
+    const communal = await this.getCommunalById(id);
+    const visibleFields = await this.getVisibleFields(user);
+    return visibleFields ? this.applyFieldFilter(communal, visibleFields) : communal;
+  }
+
+  private async getVisibleFields(user: any): Promise<string[] | null> {
+    if (!user?.custom_role_id) return null;
+    const perm = await this.prisma.roleModulePermission.findUnique({
+      where: {
+        custom_role_id_module_key: {
+          custom_role_id: user.custom_role_id,
+          module_key: 'camaras-vecinales',
+        },
+      },
+      select: { visible_fields: true },
+    });
+    if (!perm || perm.visible_fields.length === 0) return null;
+    return perm.visible_fields;
+  }
+
+  private applyFieldFilter(item: any, visibleFields: string[]): any {
+    const allowed = new Set([...ALWAYS_INCLUDE, ...visibleFields]);
+    return Object.fromEntries(Object.entries(item).filter(([k]) => allowed.has(k)));
   }
 
   async update(id: string, dto: UpdateCommunalDto): Promise<Communal> {

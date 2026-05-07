@@ -1,10 +1,9 @@
-import { Rol } from '@prisma/client';
 import {
   IsEmail,
-  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   MinLength,
@@ -49,6 +48,7 @@ export class CreateUserDto {
   @IsOptional()
   phone?: string;
 
-  @IsEnum(Rol)
-  rol: Rol;
+  @IsUUID()
+  @IsNotEmpty()
+  custom_role_id: string;
 }

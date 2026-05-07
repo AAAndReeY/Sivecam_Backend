@@ -15,11 +15,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DefenseService } from './defense.service';
 import { CreateDefenseDto, UpdateDefenseDto } from './dto';
-import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
+import { JwtAuthGuard, CustomRoleGuard, LayerKey, ModuleOp } from '../auth/guard';
 import { SuccessMessage } from '../auth/decorators';
 import { SearchDto } from '../../common/dto';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, CustomRoleGuard)
+@LayerKey('defensaCivil')
 @Controller('defense')
 export class DefenseController {
   constructor(private readonly defenseService: DefenseService) {}
@@ -34,13 +35,13 @@ export class DefenseController {
     return this.defenseService.findOne(id);
   }
 
-  @Roles('ADMINISTRATOR')
+  @ModuleOp('create')
   @Post()
   create(@Body() dto: CreateDefenseDto) {
     return this.defenseService.create(dto);
   }
 
-  @Roles('ADMINISTRATOR')
+  @ModuleOp('edit')
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -49,13 +50,13 @@ export class DefenseController {
     return this.defenseService.update(id, dto);
   }
 
-  @Roles('ADMINISTRATOR')
+  @ModuleOp('delete')
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string) {
     return this.defenseService.toggleDelete(id);
   }
 
-  @Roles('ADMINISTRATOR')
+  @ModuleOp('create')
   @Post('upload')
   @SuccessMessage('Creación masiva exitosa')
   @UseInterceptors(FileInterceptor('file'))

@@ -17,6 +17,7 @@ import { SustenanceModule } from './modules/sustenance/sustenance.module';
 import { ActivityModule } from './modules/activity/activity.module';
 import { PnpIncidenceModule } from './modules/pnp-incidence/pnp-incidence.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { CustomRoleModule } from './modules/custom-role/custom-role.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AuditModule } from './modules/audit/audit.module';
     ActivityModule,
     PnpIncidenceModule,
     AuditModule,
+    CustomRoleModule,
   ],
   controllers: [AppController],
   providers: [AppService],
