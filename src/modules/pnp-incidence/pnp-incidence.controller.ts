@@ -10,35 +10,33 @@ import {
   ParseUUIDPipe,
   UseGuards,
 } from '@nestjs/common';
-import { Rol } from '@prisma/client';
 import { PnpIncidenceService } from './pnp-incidence.service';
 import { CreatePnpIncidenceDto, UpdatePnpIncidenceDto, FilterPnpIncidenceDto } from './dto';
-import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
+import { JwtAuthGuard, CustomRoleGuard, ModuleKey, ModuleOp } from '../auth/guard';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, CustomRoleGuard)
+@ModuleKey('incidencias-pnp')
 @Controller('pnp-incidence')
 export class PnpIncidenceController {
   constructor(private readonly pnpIncidenceService: PnpIncidenceService) {}
 
-  @Roles(Rol.ADMINISTRATOR, Rol.SUPERVISOR, Rol.PNP)
   @Get()
   findAll(@Query() dto: FilterPnpIncidenceDto) {
     return this.pnpIncidenceService.findAll(dto);
   }
 
-  @Roles(Rol.ADMINISTRATOR, Rol.SUPERVISOR, Rol.PNP)
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.pnpIncidenceService.findOne(id);
   }
 
-  @Roles(Rol.ADMINISTRATOR, Rol.PNP)
+  @ModuleOp('create')
   @Post()
   create(@Body() dto: CreatePnpIncidenceDto) {
     return this.pnpIncidenceService.create(dto);
   }
 
-  @Roles(Rol.ADMINISTRATOR, Rol.PNP)
+  @ModuleOp('edit')
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -47,7 +45,7 @@ export class PnpIncidenceController {
     return this.pnpIncidenceService.update(id, dto);
   }
 
-  @Roles(Rol.ADMINISTRATOR, Rol.PNP)
+  @ModuleOp('delete')
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string) {
     return this.pnpIncidenceService.toggleDelete(id);

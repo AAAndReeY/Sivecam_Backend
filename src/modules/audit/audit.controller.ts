@@ -1,10 +1,9 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { Rol } from '@prisma/client';
-import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
+import { JwtAuthGuard, CustomRoleGuard, ModuleKey } from '../auth/guard';
 import { AuditService } from './audit.service';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Rol.SUPERADMIN)
+@UseGuards(JwtAuthGuard, CustomRoleGuard)
+@ModuleKey('auditoria')
 @Controller('audit')
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}

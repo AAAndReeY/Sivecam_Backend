@@ -11,38 +11,38 @@ import {
   UseGuards,
   UploadedFile,
   UseInterceptors,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Rol } from '@prisma/client';
 import { CommunalService } from './communal.service';
 import { CreateCommunalDto, FilterCommunalDto, UpdateCommunalDto } from './dto';
-import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
+import { JwtAuthGuard, CustomRoleGuard, ModuleKey, ModuleOp } from '../auth/guard';
 import { SuccessMessage } from '../auth/decorators';
+import { Request } from 'express';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, CustomRoleGuard)
+@ModuleKey('camaras-vecinales')
 @Controller('communal')
 export class CommunalController {
   constructor(private readonly communalService: CommunalService) {}
 
-  @Roles(Rol.ADMINISTRATOR, Rol.CODISEC, Rol.OPERATOR, Rol.SUPERVISOR)
   @Get()
-  findAll(@Query() dto: FilterCommunalDto) {
-    return this.communalService.findAll(dto);
+  findAll(@Query() dto: FilterCommunalDto, @Req() req: Request) {
+    return this.communalService.findAll(dto, req.user);
   }
 
-  @Roles(Rol.ADMINISTRATOR, Rol.CODISEC, Rol.OPERATOR, Rol.SUPERVISOR)
   @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.communalService.findOne(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.communalService.findOne(id, req.user);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('create')
   @Post()
   create(@Body() dto: CreateCommunalDto) {
     return this.communalService.create(dto);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('edit')
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -51,13 +51,13 @@ export class CommunalController {
     return this.communalService.update(id, dto);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('delete')
   @Delete(':id')
   toggleDelete(@Param('id', ParseUUIDPipe) id: string) {
     return this.communalService.toggleDelete(id);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('create')
   @Post('upload')
   @SuccessMessage('Creación masiva exitosa')
   @UseInterceptors(FileInterceptor('file'))
