@@ -21,7 +21,8 @@ export class AuthService {
         id: true,
         username: true,
         password: true,
-        rol: true,
+        custom_role_id: true,
+        custom_role: { select: { name: true, system_slug: true } },
       },
     });
     if (!user || !(await bcrypt.compare(password, user.password)))
@@ -29,15 +30,14 @@ export class AuthService {
     const { id } = user;
     const token = await this.getJwtToken({ sub: id });
     await this.prisma.user.update({
-      data: {
-        token,
-        updated_at: timezoneHelper(),
-      },
+      data: { token, updated_at: timezoneHelper() },
       where: { id },
     });
     return {
-      user: username,
-      rol: user.rol,
+      user:             username,
+      rol:              user.custom_role?.system_slug ?? null,
+      custom_role_id:   user.custom_role_id,
+      custom_role_name: user.custom_role?.name ?? null,
       token,
     };
   }

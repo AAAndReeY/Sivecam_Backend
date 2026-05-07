@@ -7,7 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
 
-type Caller = { rol: string; username: string };
+type Caller = { system_slug: string | null; username: string };
 
 @Injectable()
 export class UserService {
@@ -19,7 +19,10 @@ export class UserService {
     email: true,
     dni: true,
     phone: true,
-    rol: true,
+    custom_role_id: true,
+    custom_role: {
+      select: { id: true, name: true, system_slug: true },
+    },
     deleted_at: true,
   };
 
@@ -29,9 +32,16 @@ export class UserService {
   ) {}
 
   async create(dto: CreateUserDto, caller?: Caller): Promise<User> {
-    if (dto.rol === 'SUPERADMIN' && caller?.rol !== 'SUPERADMIN') {
+    const customRole = await this.prisma.customRole.findFirst({
+      where: { id: dto.custom_role_id, deleted_at: null },
+      select: { system_slug: true, name: true },
+    });
+    if (!customRole) throw new BadRequestException('Rol personalizado no encontrado');
+
+    if (customRole.system_slug === 'SUPERADMIN' && caller?.system_slug !== 'SUPERADMIN') {
       throw new ForbiddenException('Solo un Superadmin puede crear cuentas Superadmin');
     }
+
     const { password, ...res } = dto;
     try {
       const user = await this.prisma.user.create({
@@ -46,7 +56,7 @@ export class UserService {
         action: 'CREATE',
         entity: 'User',
         entity_id: user.id,
-        changes: { username: dto.username, rol: dto.rol, name: dto.name, lastname: dto.lastname },
+        changes: { username: dto.username, custom_role: customRole.name, name: dto.name, lastname: dto.lastname },
         performed_by: caller?.username,
       });
       return await this.getUserById(user.id);
@@ -56,9 +66,9 @@ export class UserService {
   }
 
   async findAll(dto: FilterUserDto): Promise<any> {
-    const { search, rol, ...pagination } = dto;
+    const { search, custom_role_id, ...pagination } = dto;
     const where: any = { deleted_at: null };
-    if (rol) where.rol = rol;
+    if (custom_role_id) where.custom_role_id = custom_role_id;
     if (search)
       where.OR = [
         { name:     { contains: search, mode: 'insensitive' } },
@@ -83,17 +93,25 @@ export class UserService {
   }
 
   async update(id: string, dto: UpdateUserDto, caller?: Caller): Promise<User> {
-    const { password, ...res } = dto;
     const target = await this.getUserById(id);
-    if (target.rol === 'SUPERADMIN' && caller?.rol !== 'SUPERADMIN') {
+    if (target.custom_role?.system_slug === 'SUPERADMIN' && caller?.system_slug !== 'SUPERADMIN') {
       throw new ForbiddenException('Solo un Superadmin puede modificar cuentas Superadmin');
     }
-    if (dto.rol === 'SUPERADMIN' && caller?.rol !== 'SUPERADMIN') {
-      throw new ForbiddenException('Solo un Superadmin puede asignar el rol Superadmin');
+
+    if (dto.custom_role_id !== undefined) {
+      const customRole = await this.prisma.customRole.findFirst({
+        where: { id: dto.custom_role_id, deleted_at: null },
+        select: { system_slug: true },
+      });
+      if (!customRole) throw new BadRequestException('Rol personalizado no encontrado');
+      if (customRole.system_slug === 'SUPERADMIN' && caller?.system_slug !== 'SUPERADMIN') {
+        throw new ForbiddenException('Solo un Superadmin puede asignar el rol Superadmin');
+      }
     }
-    const data = password
-      ? { password: bcrypt.hashSync(password, 10), updated_at: timezoneHelper(), ...res }
-      : { updated_at: timezoneHelper(), ...res };
+
+    const { password, ...res } = dto;
+    const data: any = { ...res, updated_at: timezoneHelper() };
+    if (password) data.password = bcrypt.hashSync(password, 10);
 
     const changes: Record<string, any> = {};
     for (const key of Object.keys(res) as (keyof typeof res)[]) {
@@ -122,7 +140,7 @@ export class UserService {
 
   async toggleDelete(id: string, caller?: Caller): Promise<any> {
     const user = await this.getUserById(id, true);
-    if (user.rol === 'SUPERADMIN' && caller?.rol !== 'SUPERADMIN') {
+    if (user.custom_role?.system_slug === 'SUPERADMIN' && caller?.system_slug !== 'SUPERADMIN') {
       throw new ForbiddenException('Solo un Superadmin puede eliminar cuentas Superadmin');
     }
     const inactive = user.deleted_at;
@@ -137,7 +155,7 @@ export class UserService {
       action,
       entity: 'User',
       entity_id: id,
-      changes: { target_username: user.username, target_rol: user.rol },
+      changes: { target_username: user.username, target_system_slug: user.custom_role?.system_slug },
       performed_by: caller?.username,
     });
 
