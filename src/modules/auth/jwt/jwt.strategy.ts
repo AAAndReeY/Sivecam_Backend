@@ -23,7 +23,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = await this.prisma.user.findFirst({
       select: {
         username: true,
-        rol: true,
+        custom_role_id: true,
+        custom_role: { select: { system_slug: true } },
       },
       where: {
         id: sub,
@@ -35,7 +36,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       user_id: sub,
       username: user.username,
-      rol: user.rol,
+      system_slug: user.custom_role?.system_slug ?? null,
+      custom_role_id: user.custom_role_id,
     };
   }
 }

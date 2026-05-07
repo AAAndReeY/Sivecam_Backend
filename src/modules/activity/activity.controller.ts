@@ -13,37 +13,35 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Rol } from '@prisma/client';
 import { ActivityService } from './activity.service';
 import { CreateActivityDto, UpdateActivityDto } from './dto';
-import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
+import { JwtAuthGuard, CustomRoleGuard, ModuleKey, ModuleOp } from '../auth/guard';
 import { SuccessMessage } from '../auth/decorators';
 import { SearchDto } from '../../common/dto';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, CustomRoleGuard)
+@ModuleKey('actividades')
 @Controller('activity')
 export class ActivityController {
   constructor(private readonly activityService: ActivityService) {}
 
-  @Roles(Rol.ADMINISTRATOR, Rol.CODISEC)
   @Get()
   findAll(@Query() dto: SearchDto) {
     return this.activityService.findAll(dto);
   }
 
-  @Roles(Rol.ADMINISTRATOR, Rol.CODISEC)
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.activityService.findOne(id);
   }
 
-  @Roles(Rol.ADMINISTRATOR, Rol.CODISEC)
+  @ModuleOp('create')
   @Post()
   create(@Body() dto: CreateActivityDto) {
     return this.activityService.create(dto);
   }
 
-  @Roles(Rol.ADMINISTRATOR, Rol.CODISEC)
+  @ModuleOp('edit')
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -52,13 +50,13 @@ export class ActivityController {
     return this.activityService.update(id, dto);
   }
 
-  @Roles(Rol.ADMINISTRATOR, Rol.CODISEC)
+  @ModuleOp('delete')
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string) {
     return this.activityService.toggleDelete(id);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('create')
   @Post('upload')
   @SuccessMessage('Creación masiva exitosa')
   @UseInterceptors(FileInterceptor('file'))

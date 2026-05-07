@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Municipal, Rol } from '@prisma/client';
+import { Municipal } from '@prisma/client';
 import * as xlsx from 'xlsx';
 import {
   CreateMunicipalDto,
@@ -8,6 +8,14 @@ import {
 } from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
+
+// Campos siempre incluidos: posición, identificación y metadata del mapa
+const ALWAYS_INCLUDE = ['id', 'name', 'latitude', 'longitude', 'camera', 'deleted_at', 'created_at', 'updated_at'];
+
+// Campos derivados: algunos visible_fields activan campos adicionales del modelo
+const FIELD_MAP: Record<string, string[]> = {
+  vision: ['angle', 'radius'], // el ángulo y radio sólo se envían si el rol puede ver el cono
+};
 
 @Injectable()
 export class MunicipalService {
@@ -25,41 +33,52 @@ export class MunicipalService {
   }
 
   async findAll(dto: FilterMunicipalDto, user: any): Promise<any> {
-    const { rol } = user;
     const { search, camera, ...pagination } = dto;
     const where: any = { deleted_at: null };
-    if (camera && rol !== Rol.VIEWER) where.camera = camera;
+    if (camera) where.camera = camera;
     if (search)
       where.OR = [
         { address: { contains: search, mode: 'insensitive' } },
         { name: { contains: search, mode: 'insensitive' } },
       ];
-    return paginationHelper(
+    const result = await paginationHelper(
       this.prisma.municipal,
-      {
-        where,
-        orderBy: { name: 'asc' },
-        ...(rol === Rol.VIEWER && {
-          select: {
-            name: true,
-            address: true,
-            latitude: true,
-            longitude: true,
-          },
-        }),
-      },
+      { where, orderBy: { name: 'asc' } },
       pagination,
     );
+    const visibleFields = await this.getVisibleFields(user);
+    if (visibleFields) {
+      result.data = result.data.map((item: any) => this.applyFieldFilter(item, visibleFields));
+    }
+    return result;
   }
 
   async findOne(id: string, user: any): Promise<any> {
-    const { rol } = user;
     const municipal = await this.getMunicipalById(id);
-    if (rol !== Rol.VIEWER) return municipal;
-    return {
-      name: municipal.name,
-      address: municipal.address,
-    };
+    const visibleFields = await this.getVisibleFields(user);
+    return visibleFields ? this.applyFieldFilter(municipal, visibleFields) : municipal;
+  }
+
+  private async getVisibleFields(user: any): Promise<string[] | null> {
+    if (!user?.custom_role_id) return null;
+    const perm = await this.prisma.roleModulePermission.findUnique({
+      where: {
+        custom_role_id_module_key: {
+          custom_role_id: user.custom_role_id,
+          module_key: 'camaras-municipales',
+        },
+      },
+      select: { visible_fields: true },
+    });
+    // visible_fields vacío = sin restricciones
+    if (!perm || perm.visible_fields.length === 0) return null;
+    return perm.visible_fields;
+  }
+
+  private applyFieldFilter(item: any, visibleFields: string[]): any {
+    const extra: string[] = visibleFields.flatMap(f => FIELD_MAP[f] ?? []);
+    const allowed = new Set([...ALWAYS_INCLUDE, ...visibleFields, ...extra]);
+    return Object.fromEntries(Object.entries(item).filter(([k]) => allowed.has(k)));
   }
 
   async update(id: string, dto: UpdateMunicipalDto): Promise<Municipal> {

@@ -13,13 +13,13 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Rol } from '@prisma/client';
 import { StopService } from './stop.service';
 import { CreateStopDto, FilterStopDto, UpdateStopDto } from './dto';
-import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guard';
+import { JwtAuthGuard, CustomRoleGuard, LayerKey, ModuleOp } from '../auth/guard';
 import { SuccessMessage } from '../auth/decorators';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, CustomRoleGuard)
+@LayerKey('paraderosAutorizados')
 @Controller('stop')
 export class StopController {
   constructor(private readonly stopService: StopService) {}
@@ -34,25 +34,25 @@ export class StopController {
     return this.stopService.findOne(id);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('create')
   @Post()
   create(@Body() dto: CreateStopDto) {
     return this.stopService.create(dto);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('edit')
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateStopDto) {
     return this.stopService.update(id, dto);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('delete')
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string) {
     return this.stopService.toggleDelete(id);
   }
 
-  @Roles(Rol.ADMINISTRATOR)
+  @ModuleOp('create')
   @Post('upload')
   @SuccessMessage('Creación masiva exitosa')
   @UseInterceptors(FileInterceptor('file'))
