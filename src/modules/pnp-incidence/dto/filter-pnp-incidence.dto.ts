@@ -34,4 +34,8 @@ export class FilterPnpIncidenceDto extends PaginationDto {
   @IsOptional()
   @IsString()
   end?: string;
+
+  @IsOptional()
+  @IsString()
+  no_shift?: string;
 }

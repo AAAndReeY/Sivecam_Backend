@@ -157,13 +157,13 @@ export class CustomRoleService {
       'pnpRoboAlPaso','pnpRoboAgravado','pnpDrogas','pnpViolenciaFamiliar',
       'pnpAccidente','pnpViolenciaSexual','pnpHomicidio','pnpLesiones',
       'pnpHurto','pnpOtros','busquedaDirecciones','ubicadorPunto','rutas',
-      'clusters','clusterCombinado','clusterPNP',
+      'clusters','clusterCombinado','clusterPNP','comisarias',
     ];
     const TOOLS = ['busquedaDirecciones','ubicadorPunto','rutas','clusters','clusterCombinado'];
-    const BASE_LAYERS = ['camaras','camarasVecinales','jurisdicciones','zonasCodisec',...TOOLS];
+    const BASE_LAYERS = ['camaras','camarasVecinales','jurisdicciones','zonasCodisec','comisarias',...TOOLS];
     const SERENOS_LAYERS = [...new Set([...BASE_LAYERS,'actividades','robos','extorsiones','homicidios','feminicidios','sicariatos','secuestros','drogas','barras','clusters','clusterCombinado'])];
     const PNP_LAYERS = [...BASE_LAYERS,'pnpRoboAlPaso','pnpRoboAgravado','pnpDrogas','pnpViolenciaFamiliar','pnpAccidente','pnpViolenciaSexual','pnpHomicidio','pnpLesiones','pnpHurto','pnpOtros','clusterPNP'];
-    const ALL_MODULES = ['camaras-municipales','camaras-vecinales','actividades','incidencias-pnp','dashboard-serenos','dashboard-pnp','auditoria','usuarios','roles'];
+    const ALL_MODULES = ['camaras-municipales','camaras-vecinales','actividades','incidencias-pnp','dashboard-serenos','dashboard-pnp','auditoria','usuarios','roles','comisarias'];
 
     const defaults: Array<{
       slug: string; name: string; system_slug: string; description: string;
