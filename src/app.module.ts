@@ -18,6 +18,7 @@ import { ActivityModule } from './modules/activity/activity.module';
 import { PnpIncidenceModule } from './modules/pnp-incidence/pnp-incidence.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { CustomRoleModule } from './modules/custom-role/custom-role.module';
+import { ComisariaModule } from './modules/comisaria/comisaria.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { CustomRoleModule } from './modules/custom-role/custom-role.module';
     PnpIncidenceModule,
     AuditModule,
     CustomRoleModule,
+    ComisariaModule,
   ],
   controllers: [AppController],
   providers: [AppService],
