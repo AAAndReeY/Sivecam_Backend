@@ -22,26 +22,32 @@ export class PnpIncidenceService {
   }
 
   async findAll(dto: FilterPnpIncidenceDto): Promise<any> {
-    const { search, incidence_type, shift, police_station, case_status, jurisdiction, start, end, ...pagination } = dto;
+    const { search, incidence_type, shift, police_station, case_status, jurisdiction, start, end, no_shift, ...pagination } = dto;
 
     const where: any = { deleted_at: null };
 
     if (search) {
       where.OR = [
-        { description: { contains: search, mode: 'insensitive' } },
+        { description:    { contains: search, mode: 'insensitive' } },
         { complaint_number: { contains: search, mode: 'insensitive' } },
         { police_station: { contains: search, mode: 'insensitive' } },
+        { incidence_type: { contains: search, mode: 'insensitive' } },
+        { jurisdiction:   { contains: search, mode: 'insensitive' } },
       ];
     }
     if (incidence_type) where.incidence_type = { contains: incidence_type, mode: 'insensitive' };
-    if (shift) where.shift = shift;
+    if (no_shift === 'true') {
+      where.shift = null;
+    } else if (shift) {
+      where.shift = shift;
+    }
     if (police_station) where.police_station = { contains: police_station, mode: 'insensitive' };
     if (case_status) where.case_status = case_status;
     if (jurisdiction) where.jurisdiction = { contains: jurisdiction, mode: 'insensitive' };
     if (start && end) {
       where.occurred_at = {
         gte: new Date(start),
-        lte: new Date(end),
+        lte: new Date(end + (end.includes('T') ? '' : 'T23:59:59')),
       };
     }
 

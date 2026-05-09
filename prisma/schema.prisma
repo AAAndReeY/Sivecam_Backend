@@ -78,6 +78,16 @@ model Defense {
   deleted_at            DateTime?
 }
 
+model Comisaria {
+  id         String    @id @default(uuid())
+  name       String
+  latitude   Float
+  longitude  Float
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+}
+
 model Jurisdiction {
   id                    String                @id @default(uuid())
   name                  String
@@ -211,13 +221,14 @@ model PnpIncidence {
   id               String      @id @default(uuid())
   description      String
   incidence_type   String
+  address          String?
   latitude         Float
   longitude        Float
   jurisdiction     String
-  shift            Shift
+  shift            Shift?
   complaint_number String?
   police_station   String
-  case_status      CaseStatus  @default(INVESTIGATING)
+  case_status      CaseStatus?
   occurred_at      DateTime
   created_at       DateTime    @default(now())
   updated_at       DateTime    @updatedAt

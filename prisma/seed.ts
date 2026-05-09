@@ -16,13 +16,13 @@ async function seedRoles() {
     'pnpRoboAlPaso','pnpRoboAgravado','pnpDrogas','pnpViolenciaFamiliar',
     'pnpAccidente','pnpViolenciaSexual','pnpHomicidio','pnpLesiones',
     'pnpHurto','pnpOtros','busquedaDirecciones','ubicadorPunto','rutas',
-    'clusters','clusterCombinado','clusterPNP',
+    'clusters','clusterCombinado','clusterPNP','comisarias',
   ];
   const TOOLS          = ['busquedaDirecciones','ubicadorPunto','rutas','clusters','clusterCombinado'];
-  const BASE_LAYERS    = ['camaras','camarasVecinales','jurisdicciones','zonasCodisec',...TOOLS];
+  const BASE_LAYERS    = ['camaras','camarasVecinales','jurisdicciones','zonasCodisec','comisarias',...TOOLS];
   const SERENOS_LAYERS = [...new Set([...BASE_LAYERS,'actividades','robos','extorsiones','homicidios','feminicidios','sicariatos','secuestros','drogas','barras','clusters','clusterCombinado'])];
   const PNP_LAYERS     = [...BASE_LAYERS,'pnpRoboAlPaso','pnpRoboAgravado','pnpDrogas','pnpViolenciaFamiliar','pnpAccidente','pnpViolenciaSexual','pnpHomicidio','pnpLesiones','pnpHurto','pnpOtros','clusterPNP'];
-  const ALL_MODULES    = ['camaras-municipales','camaras-vecinales','actividades','incidencias-pnp','dashboard-serenos','dashboard-pnp','auditoria','usuarios','roles'];
+  const ALL_MODULES    = ['camaras-municipales','camaras-vecinales','actividades','incidencias-pnp','dashboard-serenos','dashboard-pnp','auditoria','usuarios','roles','comisarias'];
 
   const defaults = [
     {
@@ -148,9 +148,31 @@ async function seedSuperadmin() {
   console.log('  ✔  Usuario superadmin creado.');
 }
 
+async function seedComisarias() {
+  const existing = await prisma.comisaria.count();
+  if (existing > 0) {
+    console.log(`  ℹ  Comisarías ya existen (${existing}), omitiendo inserción.`);
+    return;
+  }
+  const data = [
+    { name: 'Comisaria Zarate',              latitude: -12.027029,    longitude: -77.001339   },
+    { name: 'Comisaria Caja de Agua',        latitude: -12.02723284,  longitude: -77.01513948 },
+    { name: 'Comisaria Huayrona',            latitude: -11.99408543,  longitude: -77.00690468 },
+    { name: 'Comisaria Santa Elizabeth',     latitude: -11.98386753,  longitude: -77.01489598 },
+    { name: 'Comisaria Canto Rey',           latitude: -11.97515137,  longitude: -76.99574772 },
+    { name: 'Comisaria Bayovar',             latitude: -11.95218954,  longitude: -76.99164215 },
+    { name: 'Comisaria Mariscal Caceres',    latitude: -11.94912257,  longitude: -76.98062287 },
+    { name: 'Comisaria 10 de Octubre',       latitude: -11.94460628,  longitude: -76.9882119  },
+  ].map(c => ({ ...c, created_at: now(), updated_at: now() }));
+
+  await prisma.comisaria.createMany({ data });
+  console.log(`  ✔  ${data.length} comisarías insertadas.`);
+}
+
 async function main() {
   await seedRoles();
   await seedSuperadmin();
+  await seedComisarias();
 }
 
 main()

@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { CaseStatus, Shift } from '@prisma/client';
 
 export class CreatePnpIncidenceDto {
@@ -13,6 +14,10 @@ export class CreatePnpIncidenceDto {
 
   @IsString()
   incidence_type: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
 
   @IsNumber()
   latitude: number;
@@ -23,8 +28,10 @@ export class CreatePnpIncidenceDto {
   @IsString()
   jurisdiction: string;
 
+  @IsOptional()
+  @Transform(({ value }) => value ?? null)
   @IsEnum(Shift)
-  shift: Shift;
+  shift?: Shift | null;
 
   @IsString()
   police_station: string;
@@ -34,8 +41,9 @@ export class CreatePnpIncidenceDto {
   complaint_number?: string;
 
   @IsOptional()
+  @Transform(({ value }) => value ?? null)
   @IsEnum(CaseStatus)
-  case_status?: CaseStatus;
+  case_status?: CaseStatus | null;
 
   @IsDateString()
   occurred_at: string;
