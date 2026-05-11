@@ -19,6 +19,9 @@ import { PnpIncidenceModule } from './modules/pnp-incidence/pnp-incidence.module
 import { AuditModule } from './modules/audit/audit.module';
 import { CustomRoleModule } from './modules/custom-role/custom-role.module';
 import { ComisariaModule } from './modules/comisaria/comisaria.module';
+import { IncidenceTypeModule } from './modules/incidence-type/incidence-type.module';
+import { IncidenceSubtypeModule } from './modules/incidence-subtype/incidence-subtype.module';
+import { IncidenceModalityModule } from './modules/incidence-modality/incidence-modality.module';
 
 @Module({
   imports: [
@@ -42,6 +45,9 @@ import { ComisariaModule } from './modules/comisaria/comisaria.module';
     AuditModule,
     CustomRoleModule,
     ComisariaModule,
+    IncidenceTypeModule,
+    IncidenceSubtypeModule,
+    IncidenceModalityModule,
   ],
   controllers: [AppController],
   providers: [AppService],

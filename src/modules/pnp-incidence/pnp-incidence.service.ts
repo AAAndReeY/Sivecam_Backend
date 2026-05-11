@@ -4,12 +4,25 @@ import { CreatePnpIncidenceDto, UpdatePnpIncidenceDto, FilterPnpIncidenceDto } f
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
 
+const MODALITY_INCLUDE = {
+  modality: {
+    include: {
+      subtype: {
+        include: {
+          type: true,
+        },
+      },
+    },
+  },
+};
+
 @Injectable()
 export class PnpIncidenceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreatePnpIncidenceDto): Promise<PnpIncidence> {
+  async create(dto: CreatePnpIncidenceDto): Promise<any> {
     const { occurred_at, ...rest } = dto;
+    if (dto.modality_id) await this.validateModality(dto.modality_id);
     const incidence = await this.prisma.pnpIncidence.create({
       data: {
         ...rest,
@@ -22,28 +35,42 @@ export class PnpIncidenceService {
   }
 
   async findAll(dto: FilterPnpIncidenceDto): Promise<any> {
-    const { search, incidence_type, shift, police_station, case_status, jurisdiction, start, end, no_shift, ...pagination } = dto;
+    const {
+      search, incidence_type, shift, police_station, case_status,
+      jurisdiction, start, end, no_shift, type_id, subtype_id, modality_id,
+      ...pagination
+    } = dto;
 
     const where: any = { deleted_at: null };
 
     if (search) {
       where.OR = [
-        { description:    { contains: search, mode: 'insensitive' } },
+        { description:      { contains: search, mode: 'insensitive' } },
         { complaint_number: { contains: search, mode: 'insensitive' } },
-        { police_station: { contains: search, mode: 'insensitive' } },
-        { incidence_type: { contains: search, mode: 'insensitive' } },
-        { jurisdiction:   { contains: search, mode: 'insensitive' } },
+        { police_station:   { contains: search, mode: 'insensitive' } },
+        { jurisdiction:     { contains: search, mode: 'insensitive' } },
+        { modality: { name: { contains: search, mode: 'insensitive' } } },
+        { modality: { subtype: { name: { contains: search, mode: 'insensitive' } } } },
+        { modality: { subtype: { type: { name: { contains: search, mode: 'insensitive' } } } } },
       ];
     }
+
+    // Filtros por jerarquía
+    if (modality_id) where.modality_id = modality_id;
+    if (subtype_id)  where.modality = { subtype_id };
+    if (type_id)     where.modality = { subtype: { type_id } };
+
+    // Filtro legacy por texto (para compatibilidad)
     if (incidence_type) where.incidence_type = { contains: incidence_type, mode: 'insensitive' };
+
     if (no_shift === 'true') {
       where.shift = null;
     } else if (shift) {
       where.shift = shift;
     }
     if (police_station) where.police_station = { contains: police_station, mode: 'insensitive' };
-    if (case_status) where.case_status = case_status;
-    if (jurisdiction) where.jurisdiction = { contains: jurisdiction, mode: 'insensitive' };
+    if (case_status)    where.case_status = case_status;
+    if (jurisdiction)   where.jurisdiction = { contains: jurisdiction, mode: 'insensitive' };
     if (start && end) {
       where.occurred_at = {
         gte: new Date(start),
@@ -56,17 +83,19 @@ export class PnpIncidenceService {
       {
         where,
         orderBy: { occurred_at: 'desc' },
+        include: MODALITY_INCLUDE,
       },
       pagination,
     );
   }
 
-  async findOne(id: string): Promise<PnpIncidence> {
+  async findOne(id: string): Promise<any> {
     return this.getById(id);
   }
 
-  async update(id: string, dto: UpdatePnpIncidenceDto): Promise<PnpIncidence> {
+  async update(id: string, dto: UpdatePnpIncidenceDto): Promise<any> {
     await this.getById(id);
+    if (dto.modality_id) await this.validateModality(dto.modality_id);
     const { occurred_at, ...rest } = dto;
     await this.prisma.pnpIncidence.update({
       data: {
@@ -92,8 +121,16 @@ export class PnpIncidenceService {
     };
   }
 
+  private async validateModality(modality_id: string) {
+    const modality = await this.prisma.incidenceModality.findUnique({ where: { id: modality_id } });
+    if (!modality || modality.deleted_at) throw new BadRequestException('Modalidad de incidencia no encontrada');
+  }
+
   private async getById(id: string, toggle = false): Promise<any> {
-    const incidence = await this.prisma.pnpIncidence.findUnique({ where: { id } });
+    const incidence = await this.prisma.pnpIncidence.findUnique({
+      where: { id },
+      include: MODALITY_INCLUDE,
+    });
     if (!incidence) throw new BadRequestException('Incidencia PNP no encontrada');
     if (incidence.deleted_at && !toggle) throw new BadRequestException('Incidencia PNP eliminada');
     return incidence;

@@ -217,10 +217,47 @@ model RoleLayerPermission {
   @@unique([custom_role_id, layer_key])
 }
 
+model IncidenceType {
+  id         String             @id @default(uuid())
+  name       String             @unique
+  created_at DateTime           @default(now())
+  updated_at DateTime           @updatedAt
+  deleted_at DateTime?
+  subtypes   IncidenceSubtype[]
+}
+
+model IncidenceSubtype {
+  id         String              @id @default(uuid())
+  name       String
+  type_id    String
+  type       IncidenceType       @relation(fields: [type_id], references: [id])
+  created_at DateTime            @default(now())
+  updated_at DateTime            @updatedAt
+  deleted_at DateTime?
+  modalities IncidenceModality[]
+
+  @@unique([name, type_id])
+}
+
+model IncidenceModality {
+  id          String           @id @default(uuid())
+  name        String
+  subtype_id  String
+  subtype     IncidenceSubtype @relation(fields: [subtype_id], references: [id])
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @updatedAt
+  deleted_at  DateTime?
+  incidences  PnpIncidence[]
+
+  @@unique([name, subtype_id])
+}
+
 model PnpIncidence {
-  id               String      @id @default(uuid())
+  id               String             @id @default(uuid())
   description      String
-  incidence_type   String
+  modality_id      String?
+  modality         IncidenceModality? @relation(fields: [modality_id], references: [id])
+  incidence_type   String?
   address          String?
   latitude         Float
   longitude        Float
@@ -230,8 +267,8 @@ model PnpIncidence {
   police_station   String
   case_status      CaseStatus?
   occurred_at      DateTime
-  created_at       DateTime    @default(now())
-  updated_at       DateTime    @updatedAt
+  created_at       DateTime           @default(now())
+  updated_at       DateTime           @updatedAt
   deleted_at       DateTime?
 }
 
