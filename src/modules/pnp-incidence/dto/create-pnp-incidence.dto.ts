@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { CaseStatus, Shift } from '@prisma/client';
@@ -12,8 +13,9 @@ export class CreatePnpIncidenceDto {
   @IsString()
   description: string;
 
-  @IsString()
-  incidence_type: string;
+  @IsOptional()
+  @IsUUID()
+  modality_id?: string;
 
   @IsOptional()
   @IsString()
