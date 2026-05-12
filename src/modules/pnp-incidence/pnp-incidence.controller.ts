@@ -9,6 +9,7 @@ import {
   Query,
   ParseUUIDPipe,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { PnpIncidenceService } from './pnp-incidence.service';
 import { CreatePnpIncidenceDto, UpdatePnpIncidenceDto, FilterPnpIncidenceDto } from './dto';
@@ -32,8 +33,8 @@ export class PnpIncidenceController {
 
   @ModuleOp('create')
   @Post()
-  create(@Body() dto: CreatePnpIncidenceDto) {
-    return this.pnpIncidenceService.create(dto);
+  create(@Body() dto: CreatePnpIncidenceDto, @Request() req) {
+    return this.pnpIncidenceService.create(dto, req.user);
   }
 
   @ModuleOp('edit')
@@ -41,13 +42,14 @@ export class PnpIncidenceController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdatePnpIncidenceDto,
+    @Request() req,
   ) {
-    return this.pnpIncidenceService.update(id, dto);
+    return this.pnpIncidenceService.update(id, dto, req.user);
   }
 
   @ModuleOp('delete')
   @Delete(':id')
-  delete(@Param('id', ParseUUIDPipe) id: string) {
-    return this.pnpIncidenceService.toggleDelete(id);
+  delete(@Param('id', ParseUUIDPipe) id: string, @Request() req) {
+    return this.pnpIncidenceService.toggleDelete(id, req.user);
   }
 }
