@@ -22,8 +22,13 @@ export class PnpIncidenceController {
   constructor(private readonly pnpIncidenceService: PnpIncidenceService) {}
 
   @Get()
-  findAll(@Query() dto: FilterPnpIncidenceDto) {
-    return this.pnpIncidenceService.findAll(dto);
+  findAll(@Query() dto: FilterPnpIncidenceDto, @Request() req) {
+    return this.pnpIncidenceService.findAll(dto, req.user);
+  }
+
+  @Get('jurisdictions')
+  getJurisdictions() {
+    return this.pnpIncidenceService.getDistinctJurisdictions();
   }
 
   @Get(':id')

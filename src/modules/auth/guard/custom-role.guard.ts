@@ -35,7 +35,16 @@ export class CustomRoleGuard implements CanActivate {
         const layerPerm = await this.prisma.roleLayerPermission.findFirst({
           where: { custom_role_id: user.custom_role_id, layer_key: layerKey },
         });
-        if (!layerPerm) throw new ForbiddenException('No tienes acceso a esta capa');
+        if (!layerPerm) {
+          // Fallback: usuarios con incidencias-pnp pueden leer comisarías (necesario para el formulario)
+          if (layerKey === 'comisarias' && operation === 'read') {
+            const hasPnpAccess = await this.prisma.roleModulePermission.findFirst({
+              where: { custom_role_id: user.custom_role_id, module_key: 'incidencias-pnp', can_access: true },
+            });
+            if (hasPnpAccess) return true;
+          }
+          throw new ForbiddenException('No tienes acceso a esta capa');
+        }
         return true;
       }
 
@@ -53,8 +62,8 @@ export class CustomRoleGuard implements CanActivate {
       });
 
       if (!perm) {
-        // Fallback para lectura de cámaras: si tiene la capa equivalente, permitir
         if (operation === 'read') {
+          // Fallback para lectura de cámaras: si tiene la capa equivalente, permitir
           const layerFallback: Record<string, string> = {
             'camaras-municipales': 'camaras',
             'camaras-vecinales':   'camarasVecinales',
@@ -65,6 +74,27 @@ export class CustomRoleGuard implements CanActivate {
               where: { custom_role_id: user.custom_role_id, layer_key: fallbackLayer },
             });
             if (layerPerm) return true;
+          }
+
+          // Fallback de lectura: módulos que requieren leer catálogos de otro módulo
+          const readFallbackMap: Record<string, string[]> = {
+            // catálogo requerido → módulos que otorgan acceso de lectura
+            'tipos-incidencia':       ['incidencias-pnp', 'subtipos-incidencia', 'modalidades-incidencia'],
+            'subtipos-incidencia':    ['incidencias-pnp', 'modalidades-incidencia'],
+            'modalidades-incidencia': ['incidencias-pnp'],
+            'comisarias':             ['incidencias-pnp'],
+            'roles':                  ['usuarios'],
+          };
+          const fallbackParents = readFallbackMap[moduleKey];
+          if (fallbackParents) {
+            const hasParentAccess = await this.prisma.roleModulePermission.findFirst({
+              where: {
+                custom_role_id: user.custom_role_id,
+                module_key: { in: fallbackParents },
+                can_access: true,
+              },
+            });
+            if (hasParentAccess) return true;
           }
         }
         throw new ForbiddenException('No tienes acceso a este módulo');

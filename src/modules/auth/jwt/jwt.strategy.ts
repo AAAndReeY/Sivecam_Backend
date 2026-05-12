@@ -24,7 +24,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       select: {
         username: true,
         custom_role_id: true,
-        custom_role: { select: { system_slug: true } },
+        custom_role: {
+          select: {
+            system_slug: true,
+            allowed_jurisdictions: true,
+          },
+        },
       },
       where: {
         id: sub,
@@ -38,6 +43,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       username: user.username,
       system_slug: user.custom_role?.system_slug ?? null,
       custom_role_id: user.custom_role_id,
+      allowed_jurisdictions: user.custom_role?.allowed_jurisdictions ?? [],
     };
   }
 }
