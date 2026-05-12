@@ -3,6 +3,7 @@ import { PnpIncidence } from '@prisma/client';
 import { CreatePnpIncidenceDto, UpdatePnpIncidenceDto, FilterPnpIncidenceDto } from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
+import { AuditService } from '../audit/audit.service';
 
 const MODALITY_INCLUDE = {
   modality: {
@@ -18,9 +19,12 @@ const MODALITY_INCLUDE = {
 
 @Injectable()
 export class PnpIncidenceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
-  async create(dto: CreatePnpIncidenceDto): Promise<any> {
+  async create(dto: CreatePnpIncidenceDto, caller?: { username: string }): Promise<any> {
     const { occurred_at, ...rest } = dto;
     if (dto.modality_id) await this.validateModality(dto.modality_id);
     const incidence = await this.prisma.pnpIncidence.create({
@@ -30,6 +34,13 @@ export class PnpIncidenceService {
         created_at: timezoneHelper(),
         updated_at: timezoneHelper(),
       },
+    });
+    await this.audit.log({
+      action: 'CREATE',
+      entity: 'PnpIncidence',
+      entity_id: incidence.id,
+      changes: { jurisdiction: dto.jurisdiction, police_station: dto.police_station, modality_id: dto.modality_id },
+      performed_by: caller?.username,
     });
     return this.getById(incidence.id);
   }
@@ -93,7 +104,7 @@ export class PnpIncidenceService {
     return this.getById(id);
   }
 
-  async update(id: string, dto: UpdatePnpIncidenceDto): Promise<any> {
+  async update(id: string, dto: UpdatePnpIncidenceDto, caller?: { username: string }): Promise<any> {
     await this.getById(id);
     if (dto.modality_id) await this.validateModality(dto.modality_id);
     const { occurred_at, ...rest } = dto;
@@ -105,20 +116,32 @@ export class PnpIncidenceService {
       },
       where: { id },
     });
+    await this.audit.log({
+      action: 'UPDATE',
+      entity: 'PnpIncidence',
+      entity_id: id,
+      changes: { ...rest, ...(occurred_at && { occurred_at }) },
+      performed_by: caller?.username,
+    });
     return this.getById(id);
   }
 
-  async toggleDelete(id: string): Promise<any> {
+  async toggleDelete(id: string, caller?: { username: string }): Promise<any> {
     const incidence = await this.getById(id, true);
     const deleted_at = incidence.deleted_at ? null : timezoneHelper();
     await this.prisma.pnpIncidence.update({
       data: { updated_at: timezoneHelper(), deleted_at },
       where: { id },
     });
-    return {
-      action: incidence.deleted_at ? 'Restore' : 'Delete',
-      id,
-    };
+    const action = incidence.deleted_at ? 'RESTORE' : 'DELETE';
+    await this.audit.log({
+      action,
+      entity: 'PnpIncidence',
+      entity_id: id,
+      changes: { jurisdiction: incidence.jurisdiction, police_station: incidence.police_station },
+      performed_by: caller?.username,
+    });
+    return { action, id };
   }
 
   private async validateModality(modality_id: string) {
