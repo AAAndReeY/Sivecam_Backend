@@ -51,6 +51,11 @@ export class CreateCustomRoleDto {
   description?: string;
 
   @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  allowed_jurisdictions?: string[];
+
+  @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ModulePermissionDto)
   modules: ModulePermissionDto[];
