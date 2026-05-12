@@ -30,6 +30,7 @@ export class CustomRoleService {
         data: {
           name: dto.name,
           description: dto.description,
+          allowed_jurisdictions: dto.allowed_jurisdictions ?? [],
           created_at: timezoneHelper(),
           updated_at: timezoneHelper(),
           module_permissions: {
@@ -89,9 +90,10 @@ export class CustomRoleService {
       const role = await this.prisma.customRole.update({
         where: { id },
         data: {
-          name:        dto.name,
-          description: dto.description,
-          updated_at:  timezoneHelper(),
+          name:                 dto.name,
+          description:          dto.description,
+          allowed_jurisdictions: dto.allowed_jurisdictions ?? [],
+          updated_at:           timezoneHelper(),
           ...(dto.modules !== undefined && {
             module_permissions: {
               deleteMany: {},

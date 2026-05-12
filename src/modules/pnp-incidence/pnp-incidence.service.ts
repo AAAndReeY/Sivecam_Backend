@@ -45,7 +45,7 @@ export class PnpIncidenceService {
     return this.getById(incidence.id);
   }
 
-  async findAll(dto: FilterPnpIncidenceDto): Promise<any> {
+  async findAll(dto: FilterPnpIncidenceDto, caller?: { allowed_jurisdictions?: string[] }): Promise<any> {
     const {
       search, incidence_type, shift, police_station, case_status,
       jurisdiction, start, end, no_shift, type_id, subtype_id, modality_id,
@@ -53,6 +53,11 @@ export class PnpIncidenceService {
     } = dto;
 
     const where: any = { deleted_at: null };
+
+    // Filtro de jurisdicciones del rol — forzado, no puede ser sobreescrito por query params
+    if (caller?.allowed_jurisdictions?.length) {
+      where.jurisdiction = { in: caller.allowed_jurisdictions };
+    }
 
     if (search) {
       where.OR = [
@@ -81,7 +86,9 @@ export class PnpIncidenceService {
     }
     if (police_station) where.police_station = { contains: police_station, mode: 'insensitive' };
     if (case_status)    where.case_status = case_status;
-    if (jurisdiction)   where.jurisdiction = { contains: jurisdiction, mode: 'insensitive' };
+    // Solo aplicar filtro de jurisdiction por query param si el rol no restringe jurisdicciones
+    if (jurisdiction && !caller?.allowed_jurisdictions?.length)
+      where.jurisdiction = { contains: jurisdiction, mode: 'insensitive' };
     if (start && end) {
       where.occurred_at = {
         gte: new Date(start),
@@ -98,6 +105,40 @@ export class PnpIncidenceService {
       },
       pagination,
     );
+  }
+
+  async getDistinctJurisdictions(): Promise<string[]> {
+    const [incidenceRows, comisariaRows] = await Promise.all([
+      this.prisma.pnpIncidence.findMany({
+        select: { jurisdiction: true },
+        distinct: ['jurisdiction'],
+      }),
+      this.prisma.comisaria.findMany({
+        where: { deleted_at: null },
+        select: { name: true },
+      }),
+    ]);
+
+    // Quita el prefijo "Comisaria" o "Comisaría" del nombre
+    const stripPrefix = (s: string) => s.replace(/^comisari[aá]\s+/i, '').trim();
+    // Normaliza para comparar: minúsculas + sin acentos
+    const norm = (s: string) =>
+      s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+    // Mapa normalizado -> nombre canónico
+    // Primero las comisarías (base), luego las incidencias las sobreescriben (tienen acentos correctos)
+    const map = new Map<string, string>();
+
+    for (const row of comisariaRows) {
+      const stripped = stripPrefix(row.name);
+      if (stripped) map.set(norm(stripped), stripped);
+    }
+    for (const row of incidenceRows) {
+      const j = row.jurisdiction?.trim();
+      if (j) map.set(norm(j), j);
+    }
+
+    return [...map.values()].sort((a, b) => a.localeCompare(b, 'es'));
   }
 
   async findOne(id: string): Promise<any> {

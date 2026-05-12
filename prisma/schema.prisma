@@ -182,16 +182,17 @@ model User {
 }
 
 model CustomRole {
-  id                    String                    @id @default(uuid())
-  name                  String                    @unique
-  system_slug           String?                   @unique
-  description           String?
-  created_at            DateTime                  @default(now())
-  updated_at            DateTime                  @updatedAt
-  deleted_at            DateTime?
-  users                 User[]
-  module_permissions    RoleModulePermission[]
-  layer_permissions     RoleLayerPermission[]
+  id                      String                    @id @default(uuid())
+  name                    String                    @unique
+  system_slug             String?                   @unique
+  description             String?
+  allowed_jurisdictions   String[]                  @default([])
+  created_at              DateTime                  @default(now())
+  updated_at              DateTime                  @updatedAt
+  deleted_at              DateTime?
+  users                   User[]
+  module_permissions      RoleModulePermission[]
+  layer_permissions       RoleLayerPermission[]
 }
 
 model RoleModulePermission {
