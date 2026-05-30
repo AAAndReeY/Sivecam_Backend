@@ -151,21 +151,35 @@ export class CustomRoleService {
 
   // ── Crea/sincroniza todos los roles base y los asigna a usuarios sin rol personalizado ──
   async seedDefaultRoles() {
+    // Subtipos individuales de patrimonio
+    const ROBO_KEYS   = ['roboPersonas','roboCasa','roboGanado','roboEmpresas','roboVehiculos','roboAutopartes','roboPasajeros'];
+    const HURTO_KEYS  = ['hurtoPersonas','hurtoCasa','hurtoGanado','hurtoEmpresas','hurtoVehiculos','hurtoPasajeros'];
+    const PATRIMONIO_KEYS = [...ROBO_KEYS, ...HURTO_KEYS, 'danos'];
+
     const ALL_LAYERS = [
       'camaras','camarasVecinales','jurisdicciones','zonasCodisec',
       'paraderosAutorizados','paraderosNoAutorizados','defensaCivil','residuos',
-      'sostenimiento','actividades','robos','extorsiones','homicidios',
-      'feminicidios','sicariatos','secuestros','drogas','barras',
+      'sostenimiento','actividades',
+      // Incidencias Serenos — subtipos individuales
+      ...PATRIMONIO_KEYS,
+      'extorsiones','homicidios','feminicidios','sicariatos','secuestros','drogas','barras',
+      // Incidencias PNP
       'pnpRoboAlPaso','pnpRoboAgravado','pnpDrogas','pnpViolenciaFamiliar',
       'pnpAccidente','pnpViolenciaSexual','pnpHomicidio','pnpLesiones',
-      'pnpHurto','pnpOtros','busquedaDirecciones','ubicadorPunto','rutas',
-      'clusters','clusterCombinado','clusterPNP','comisarias',
+      'pnpHurto','pnpOtros',
+      // Herramientas
+      'busquedaDirecciones','ubicadorPunto','rutas','clusters','clusterCombinado','clusterPNP','comisarias',
     ];
     const TOOLS = ['busquedaDirecciones','ubicadorPunto','rutas','clusters','clusterCombinado'];
     const BASE_LAYERS = ['camaras','camarasVecinales','jurisdicciones','zonasCodisec','comisarias',...TOOLS];
-    const SERENOS_LAYERS = [...new Set([...BASE_LAYERS,'actividades','robos','extorsiones','homicidios','feminicidios','sicariatos','secuestros','drogas','barras','clusters','clusterCombinado'])];
+    const SERENOS_LAYERS = [...new Set([
+      ...BASE_LAYERS,'actividades',
+      ...PATRIMONIO_KEYS,
+      'extorsiones','homicidios','feminicidios','sicariatos','secuestros','drogas','barras',
+      'clusters','clusterCombinado',
+    ])];
     const PNP_LAYERS = [...BASE_LAYERS,'pnpRoboAlPaso','pnpRoboAgravado','pnpDrogas','pnpViolenciaFamiliar','pnpAccidente','pnpViolenciaSexual','pnpHomicidio','pnpLesiones','pnpHurto','pnpOtros','clusterPNP'];
-    const ALL_MODULES = ['camaras-municipales','camaras-vecinales','actividades','incidencias-pnp','dashboard-serenos','dashboard-pnp','auditoria','usuarios','roles','comisarias'];
+    const ALL_MODULES = ['camaras-municipales','camaras-vecinales','actividades','incidencias-pnp','dashboard-serenos','dashboard-pnp','reportes-incidencias','auditoria','usuarios','roles','comisarias'];
 
     const defaults: Array<{
       slug: string; name: string; system_slug: string; description: string;
@@ -195,7 +209,7 @@ export class CustomRoleService {
         name: 'Supervisor',
         system_slug: 'SUPERVISOR',
         description: 'Gestión de actividades y dashboard de serenos',
-        modules: ['camaras-municipales','camaras-vecinales','actividades','dashboard-serenos'],
+        modules: ['camaras-municipales','camaras-vecinales','actividades','dashboard-serenos','reportes-incidencias'],
         layers: SERENOS_LAYERS,
         cameraFields: {
           municipal: ['address','buttom','megaphone'],
@@ -207,7 +221,7 @@ export class CustomRoleService {
         name: 'CODISEC',
         system_slug: 'CODISEC',
         description: 'Actividades y dashboard de serenos',
-        modules: ['camaras-municipales','camaras-vecinales','actividades','dashboard-serenos'],
+        modules: ['camaras-municipales','camaras-vecinales','actividades','dashboard-serenos','reportes-incidencias'],
         layers: SERENOS_LAYERS,
         cameraFields: {
           municipal: ['address','buttom','megaphone'],
