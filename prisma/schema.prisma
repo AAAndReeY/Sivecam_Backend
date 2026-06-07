@@ -153,6 +153,21 @@ model Stop {
   deleted_at            DateTime?
 }
 
+model CampaignPoint {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  category    String
+  lat         Float?
+  lng         Float?
+  polygon     Json?
+  geom_type   String    @default("POINT")
+  color       String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+}
+
 model Sustenance {
   id                    String                @id @default(uuid())
   name                  String
