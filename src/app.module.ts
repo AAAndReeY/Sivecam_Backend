@@ -22,6 +22,7 @@ import { ComisariaModule } from './modules/comisaria/comisaria.module';
 import { IncidenceTypeModule } from './modules/incidence-type/incidence-type.module';
 import { IncidenceSubtypeModule } from './modules/incidence-subtype/incidence-subtype.module';
 import { IncidenceModalityModule } from './modules/incidence-modality/incidence-modality.module';
+import { CampaignPointModule } from './modules/campaign-point/campaign-point.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { IncidenceModalityModule } from './modules/incidence-modality/incidence-
     IncidenceTypeModule,
     IncidenceSubtypeModule,
     IncidenceModalityModule,
+    CampaignPointModule,
   ],
   controllers: [AppController],
   providers: [AppService],
