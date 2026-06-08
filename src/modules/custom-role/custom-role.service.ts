@@ -169,6 +169,8 @@ export class CustomRoleService {
       'pnpHurto','pnpOtros',
       // Herramientas
       'busquedaDirecciones','ubicadorPunto','rutas','clusters','clusterCombinado','clusterPNP','comisarias',
+      // Campaña
+      'puntosCampana',
     ];
     const TOOLS = ['busquedaDirecciones','ubicadorPunto','rutas','clusters','clusterCombinado'];
     const BASE_LAYERS = ['camaras','camarasVecinales','jurisdicciones','zonasCodisec','comisarias',...TOOLS];
