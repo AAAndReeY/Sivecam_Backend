@@ -26,6 +26,10 @@ export class GpsRadioService {
   private cachedToken: string | null = null;
   private tokenExpiresAt = 0;
 
+  private cachedUnits: any[] | null = null;
+  private unitsExpiresAt = 0;
+  private readonly UNITS_TTL_MS = 15_000; // 15 segundos
+
   private async getToken(): Promise<string> {
     if (this.cachedToken && Date.now() < this.tokenExpiresAt) {
       return this.cachedToken;
@@ -170,6 +174,10 @@ export class GpsRadioService {
   }
 
   async findAll() {
+    if (this.cachedUnits && Date.now() < this.unitsExpiresAt) {
+      return this.cachedUnits;
+    }
+
     const token = await this.getToken();
 
     // Construir form-data manualmente
@@ -195,7 +203,7 @@ export class GpsRadioService {
 
     const raw = JSON.parse(res.data) as any[];
 
-    return raw.map((u) => ({
+    const units = raw.map((u) => ({
       issi: u._issi,
       unicocodigo: u._unicocodigo,
       idUnidad: u._idtunidad,
@@ -211,5 +219,9 @@ export class GpsRadioService {
       velocidad: u._velocidad,
       direccion: u._direccion,
     })).filter((u) => u.latitud && u.longitud && Math.abs(u.latitud) < 90 && Math.abs(u.longitud) < 180);
+
+    this.cachedUnits = units;
+    this.unitsExpiresAt = Date.now() + this.UNITS_TTL_MS;
+    return units;
   }
 }

@@ -5,5 +5,6 @@ import { GpsRadioController } from './gps-radio.controller';
 @Module({
   controllers: [GpsRadioController],
   providers: [GpsRadioService],
+  exports: [GpsRadioService],
 })
 export class GpsRadioModule {}
