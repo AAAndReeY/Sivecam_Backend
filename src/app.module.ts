@@ -23,6 +23,8 @@ import { IncidenceTypeModule } from './modules/incidence-type/incidence-type.mod
 import { IncidenceSubtypeModule } from './modules/incidence-subtype/incidence-subtype.module';
 import { IncidenceModalityModule } from './modules/incidence-modality/incidence-modality.module';
 import { CampaignPointModule } from './modules/campaign-point/campaign-point.module';
+import { GpsRadioModule } from './modules/gps-radio/gps-radio.module';
+import { GpsZonaModule } from './modules/gps-zona/gps-zona.module';
 
 @Module({
   imports: [
@@ -50,6 +52,8 @@ import { CampaignPointModule } from './modules/campaign-point/campaign-point.mod
     IncidenceSubtypeModule,
     IncidenceModalityModule,
     CampaignPointModule,
+    GpsRadioModule,
+    GpsZonaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

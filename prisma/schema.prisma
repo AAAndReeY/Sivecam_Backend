@@ -308,3 +308,16 @@ model AuditLog {
   performed_by String?
   created_at   DateTime @default(now())
 }
+
+model GpsZone {
+  id          String    @id @default(uuid())
+  nombre      String
+  descripcion String?
+  geojson     String
+  color       String    @default("#6366f1")
+  activo      Boolean   @default(true)
+  radios_issi String    @default("[]")
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+}
