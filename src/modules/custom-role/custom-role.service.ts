@@ -171,9 +171,14 @@ export class CustomRoleService {
       'busquedaDirecciones','ubicadorPunto','rutas','clusters','clusterCombinado','clusterPNP','comisarias',
       // Campaña
       'puntosCampana',
+      // Radios GPS
+      'radios',
+      // Radios GPS - herramientas
+      'puntosCercanos',
+      'cercosGps',
     ];
     const TOOLS = ['busquedaDirecciones','ubicadorPunto','rutas','clusters','clusterCombinado'];
-    const BASE_LAYERS = ['camaras','camarasVecinales','jurisdicciones','zonasCodisec','comisarias',...TOOLS];
+    const BASE_LAYERS = ['camaras','camarasVecinales','jurisdicciones','zonasCodisec','comisarias','radios','puntosCercanos','cercosGps',...TOOLS];
     const SERENOS_LAYERS = [...new Set([
       ...BASE_LAYERS,'actividades',
       ...PATRIMONIO_KEYS,
