@@ -173,6 +173,90 @@ export class GpsRadioService {
     }));
   }
 
+  async buscarIssi(issi: string) {
+    const token = await this.getToken();
+    const boundary = '----FormBoundary' + Math.random().toString(16).slice(2);
+    const formBody =
+      `--${boundary}\r\nContent-Disposition: form-data; name="vIssi"\r\n\r\n${issi}\r\n--${boundary}--\r\n`;
+
+    const res = await httpsRequest(`${DOLPHIN_BASE_URL}/buscar_issi`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': Buffer.byteLength(formBody),
+      },
+    }, formBody);
+
+    if (res.status < 200 || res.status >= 300) {
+      this.cachedToken = null;
+      throw new InternalServerErrorException('Error al buscar radio en Dolphin');
+    }
+
+    const raw = JSON.parse(res.data);
+    const u = Array.isArray(raw) ? raw[0] : raw;
+    return {
+      issi:       u._issi,
+      empresa:    u._empresa,
+      idtipunidad: u._idtipunidad,
+      tipdesc:    u._tipdesc,
+      tipabre:    u._tipabre,
+      unicodigo:  u._unicodigo,
+      unidesc:    u._unidesc,
+      uniplaca:   u._uniplaca,
+      unimodelo:  u._unimodelo,
+      imei:       u._imei,
+    };
+  }
+
+  async actualizarUnidad(issi: string, body: {
+    idtipunidad: number;
+    tipdesc: string;
+    tipabre: string;
+    unicodigo: string;
+    unidesc: string;
+    uniplaca: string;
+    unimodelo: string;
+    imei: string;
+  }) {
+    const token = await this.getToken();
+    const boundary = '----FormBoundary' + Math.random().toString(16).slice(2);
+    const fields: Record<string, string> = {
+      vidempresa:       '35',
+      vIdUsuarioLocal:  '265',
+      _issi:            String(issi),
+      _idtipunidad:     String(body.idtipunidad),
+      _tipdesc:         body.tipdesc,
+      _tipabre:         body.tipabre,
+      _unicodigo:       body.unicodigo  ?? '',
+      _unidesc:         body.unidesc    ?? '',
+      _uniplaca:        body.uniplaca   ?? '',
+      _unimodelo:       body.unimodelo  ?? '',
+      _imei:            body.imei       ?? '',
+    };
+    const formBody =
+      Object.entries(fields)
+        .map(([k, v]) => `--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}`)
+        .join('\r\n') + `\r\n--${boundary}--\r\n`;
+
+    const res = await httpsRequest(`${DOLPHIN_BASE_URL}/usuario_local_unidades`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': Buffer.byteLength(formBody),
+      },
+    }, formBody);
+
+    if (res.status < 200 || res.status >= 300) {
+      this.cachedToken = null;
+      throw new InternalServerErrorException('Error al actualizar radio en Dolphin');
+    }
+
+    this.cachedUnits = null; // invalidar cache
+    return JSON.parse(res.data);
+  }
+
   async findAll() {
     if (this.cachedUnits && Date.now() < this.unitsExpiresAt) {
       return this.cachedUnits;
