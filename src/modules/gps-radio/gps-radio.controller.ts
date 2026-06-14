@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Query, Param, Body, UseGuards } from '@nestjs/common';
 import { GpsRadioService } from './gps-radio.service';
 import { JwtAuthGuard, CustomRoleGuard, LayerKey } from '../auth/guard';
 
@@ -31,6 +31,16 @@ export class GpsRadioController {
     @Query('fechaFin') fechaFin: string,
   ) {
     return this.gpsRadioService.findKmDias(issi, fechaInicio, fechaFin);
+  }
+
+  @Get('info')
+  buscarIssi(@Query('issi') issi: string) {
+    return this.gpsRadioService.buscarIssi(issi);
+  }
+
+  @Patch(':issi')
+  actualizarUnidad(@Param('issi') issi: string, @Body() body: any) {
+    return this.gpsRadioService.actualizarUnidad(issi, body);
   }
 
   @Get('cercanos')
