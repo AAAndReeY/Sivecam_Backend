@@ -2,7 +2,6 @@ import {
   IsString,
   IsOptional,
   IsNumber,
-  IsObject,
   IsIn,
 } from 'class-validator';
 
@@ -26,8 +25,7 @@ export class CreateCampaignPointDto {
   lng?: number;
 
   @IsOptional()
-  @IsObject()
-  polygon?: object;
+  polygon?: number[][] | number[][][];
 
   @IsOptional()
   @IsIn(['POINT', 'POLYGON', 'POLYLINE', 'MULTI'])
