@@ -43,6 +43,24 @@ export class CustomRoleGuard implements CanActivate {
             });
             if (hasPnpAccess) return true;
           }
+          // Fallback: la capa agregada 'robos' se cumple si el usuario tiene acceso al dashboard
+          // de serenos O tiene cualquier capa individual de incidencia asignada
+          if (layerKey === 'robos' && operation === 'read') {
+            const INCIDENCE_KEYS = [
+              'roboPersonas','roboCasa','roboGanado','roboEmpresas','roboVehiculos','roboAutopartes','roboPasajeros',
+              'hurtoPersonas','hurtoCasa','hurtoGanado','hurtoEmpresas','hurtoVehiculos','hurtoPasajeros',
+              'danos','extorsiones','homicidios','feminicidios','sicariatos','secuestros','drogas','barras',
+            ];
+            const [anyLayer, dashboard] = await Promise.all([
+              this.prisma.roleLayerPermission.findFirst({
+                where: { custom_role_id: user.custom_role_id, layer_key: { in: INCIDENCE_KEYS } },
+              }),
+              this.prisma.roleModulePermission.findFirst({
+                where: { custom_role_id: user.custom_role_id, module_key: 'dashboard-serenos', can_access: true },
+              }),
+            ]);
+            if (anyLayer || dashboard) return true;
+          }
           throw new ForbiddenException('No tienes acceso a esta capa');
         }
         return true;
