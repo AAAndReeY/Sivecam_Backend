@@ -111,8 +111,8 @@ export class MunicipalService {
   }
 
   async upload(file: Express.Multer.File) {
-    const municipal = await this.prisma.municipal.findMany();
-    if (municipal.length !== 0)
+    const count = await this.prisma.municipal.count();
+    if (count !== 0)
       throw new BadRequestException('Solo se puede realizar una vez');
     const workbook = xlsx.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
@@ -137,15 +137,17 @@ export class MunicipalService {
   async angle(file: Express.Multer.File) {
     const text = file.buffer.toString('utf8');
     const municipal = JSON.parse(text);
-    for (const camera of municipal.features) {
-      await this.prisma.municipal.update({
-        data: {
-          angle: camera?.geometry.angle,
-          updated_at: timezoneHelper(),
-        },
-        where: { name: camera?.properties?.name },
-      });
-    }
+    await Promise.all(
+      municipal.features.map((camera: any) =>
+        this.prisma.municipal.update({
+          data: {
+            angle: camera?.geometry.angle,
+            updated_at: timezoneHelper(),
+          },
+          where: { name: camera?.properties?.name },
+        }),
+      ),
+    );
     return { success: true };
   }
 

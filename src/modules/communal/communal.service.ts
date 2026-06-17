@@ -102,8 +102,8 @@ export class CommunalService {
   }
 
   async upload(file: Express.Multer.File) {
-    const communal = await this.prisma.municipal.findMany();
-    if (communal.length !== 0)
+    const count = await this.prisma.communal.count();
+    if (count !== 0)
       throw new BadRequestException('Solo se puede realizar una vez');
     const workbook = xlsx.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
