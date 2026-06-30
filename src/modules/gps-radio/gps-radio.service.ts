@@ -8,7 +8,7 @@ const DOLPHIN_PASSWORD = 'usrsjl2026';
 // Dolphin usa certificado con cadena no reconocida por Node
 const insecureAgent = new https.Agent({ rejectUnauthorized: false });
 
-function httpsRequest(url: string, options: https.RequestOptions, body?: string | Buffer): Promise<{ status: number; data: string }> {
+function httpsRequest(url: string, options: https.RequestOptions, body?: string | Buffer, timeoutMs = 10000): Promise<{ status: number; data: string }> {
   return new Promise((resolve, reject) => {
     const req = https.request(url, { ...options, agent: insecureAgent }, (res) => {
       let data = '';
@@ -16,6 +16,9 @@ function httpsRequest(url: string, options: https.RequestOptions, body?: string 
       res.on('end', () => resolve({ status: res.statusCode ?? 0, data }));
     });
     req.on('error', reject);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`Dolphin API timeout after ${timeoutMs}ms: ${url}`));
+    });
     if (body) req.write(body);
     req.end();
   });
@@ -75,7 +78,13 @@ export class GpsRadioService {
     horaInicio?: string, horaFin?: string,
   ) {
     if (fechaInicio || fechaFin) {
-      return this.findCercanosPorPunto(lat, lng, metros, fechaInicio!, fechaFin!, horaInicio, horaFin);
+      try {
+        return await this.findCercanosPorPunto(lat, lng, metros, fechaInicio!, fechaFin!, horaInicio, horaFin);
+      } catch (err) {
+        console.error('[findCercanos] buscar_radios_por_punto falló, usando fallback haversine:', err?.message ?? err);
+        // Fallback: filtrar posición actual por fecha/hora
+        return this.findCercanosConFiltroFecha(lat, lng, metros, fechaInicio, fechaFin, horaInicio, horaFin);
+      }
     }
 
     // Sin filtro de fecha: posición actual + haversine
@@ -84,6 +93,42 @@ export class GpsRadioService {
       const distancia = this.haversineMetros(lat, lng, u.latitud, u.longitud);
       (u as any).distancia_metros = distancia;
       return distancia <= metros;
+    }).sort((a, b) => (a as any).distancia_metros - (b as any).distancia_metros);
+  }
+
+  private async findCercanosConFiltroFecha(
+    lat: number, lng: number, metros: number,
+    fechaInicio?: string, fechaFin?: string,
+    horaInicio?: string, horaFin?: string,
+  ) {
+    const all = await this.findAll();
+    return all.filter((u) => {
+      const distancia = this.haversineMetros(lat, lng, u.latitud, u.longitud);
+      if (distancia > metros) return false;
+      (u as any).distancia_metros = distancia;
+
+      if (!u.fechaHora) return true;
+      const raw = String(u.fechaHora);
+      let fh: Date;
+      if (/^\d{2}\/\d{2}\/\d{4}/.test(raw)) {
+        const [dp, tp = '00:00:00'] = raw.split(' ');
+        const [dd, mm, yyyy] = dp.split('/');
+        fh = new Date(`${yyyy}-${mm}-${dd}T${tp}`);
+      } else {
+        fh = new Date(raw.replace(' ', 'T'));
+      }
+      if (isNaN(fh.getTime())) return true;
+      if (fechaInicio && fh < new Date(fechaInicio + 'T00:00:00')) return false;
+      if (fechaFin   && fh > new Date(fechaFin   + 'T23:59:59')) return false;
+      if (horaInicio) {
+        const [h, m] = horaInicio.split(':').map(Number);
+        if (fh.getHours() * 60 + fh.getMinutes() < h * 60 + m) return false;
+      }
+      if (horaFin) {
+        const [h, m] = horaFin.split(':').map(Number);
+        if (fh.getHours() * 60 + fh.getMinutes() > h * 60 + m) return false;
+      }
+      return true;
     }).sort((a, b) => (a as any).distancia_metros - (b as any).distancia_metros);
   }
 
