@@ -33,4 +33,14 @@ export class AppController {
   ) {
     return this.gpsRadioService.findCercanos(lat, lng, radio);
   }
+
+  /** Endpoint público: bodycams cercanas a una coordenada. No requiere autenticación. */
+  @Get('bodycams/cercanas')
+  bodycamsCercanas(
+    @Query('lat', ParseFloatPipe) lat: number,
+    @Query('lng', ParseFloatPipe) lng: number,
+    @Query('radio', new DefaultValuePipe(500), ParseFloatPipe) radio: number,
+  ) {
+    return this.appService.bodycamsCercanas(lat, lng, radio);
+  }
 }
