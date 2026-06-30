@@ -1,5 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
+import * as http from 'http';
+
+const BODYCAM_BASE_URL = 'http://gps-bodycam.munisjl.gob.pe:8087';
+const BODYCAM_TOKEN    = 'cecom2026';
+
+function httpGet(url: string, headers: Record<string, string> = {}): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const req = http.get(url, { headers }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => resolve(data));
+    });
+    req.on('error', reject);
+  });
+}
 
 function haversineMetros(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
@@ -68,5 +83,17 @@ export class AppService {
 
     resultado.sort((a, b) => a.distanciaM - b.distanciaM);
     return resultado;
+  }
+
+  async bodycamsCercanas(lat: number, lng: number, radio: number) {
+    const raw  = await httpGet(`${BODYCAM_BASE_URL}/api/bodycams`, { Authorization: `Bearer ${BODYCAM_TOKEN}` });
+    const data = JSON.parse(raw);
+    const all: any[] = Array.isArray(data) ? data : (data?.data ?? []);
+
+    return all
+      .filter((bc) => bc.activa && bc.latitud != null && bc.longitud != null)
+      .map((bc) => ({ ...bc, distanciaM: Math.round(haversineMetros(lat, lng, Number(bc.latitud), Number(bc.longitud))) }))
+      .filter((bc) => bc.distanciaM <= radio)
+      .sort((a, b) => a.distanciaM - b.distanciaM);
   }
 }
