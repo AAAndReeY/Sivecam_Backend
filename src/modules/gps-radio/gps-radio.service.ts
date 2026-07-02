@@ -8,7 +8,7 @@ const DOLPHIN_PASSWORD = 'usrsjl2026';
 // Dolphin usa certificado con cadena no reconocida por Node
 const insecureAgent = new https.Agent({ rejectUnauthorized: false });
 
-function httpsRequest(url: string, options: https.RequestOptions, body?: string | Buffer): Promise<{ status: number; data: string }> {
+function httpsRequest(url: string, options: https.RequestOptions, body?: string | Buffer, timeoutMs = 10000): Promise<{ status: number; data: string }> {
   return new Promise((resolve, reject) => {
     const req = https.request(url, { ...options, agent: insecureAgent }, (res) => {
       let data = '';
@@ -16,6 +16,9 @@ function httpsRequest(url: string, options: https.RequestOptions, body?: string 
       res.on('end', () => resolve({ status: res.statusCode ?? 0, data }));
     });
     req.on('error', reject);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`Dolphin API timeout after ${timeoutMs}ms: ${url}`));
+    });
     if (body) req.write(body);
     req.end();
   });
@@ -27,6 +30,7 @@ export class GpsRadioService {
   private tokenExpiresAt = 0;
 
   private cachedUnits: any[] | null = null;
+  private cachedUnitsAll: any[] | null = null; // incluye radios sin GPS (para metadata)
   private unitsExpiresAt = 0;
   private readonly UNITS_TTL_MS = 15_000; // 15 segundos
 
@@ -54,48 +58,129 @@ export class GpsRadioService {
     return token;
   }
 
+  private toDolphinDateTime(fecha: string, hora: string): string {
+    const [yyyy, mm, dd] = fecha.split('-');
+    return `${dd}/${mm}/${yyyy} ${hora}`;
+  }
+
+  private haversineMetros(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371000;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  }
+
   async findCercanos(
     lat: number, lng: number, metros: number,
     fechaInicio?: string, fechaFin?: string,
     horaInicio?: string, horaFin?: string,
   ) {
-    let all = await this.findAll();
-
-    if (fechaInicio || fechaFin || horaInicio || horaFin) {
-      all = all.filter((u) => {
-        if (!u.fechaHora) return false;
-        const fh = new Date(String(u.fechaHora).replace(' ', 'T'));
-        if (isNaN(fh.getTime())) return false;
-
-        if (fechaInicio) {
-          if (fh < new Date(fechaInicio + 'T00:00:00')) return false;
-        }
-        if (fechaFin) {
-          if (fh > new Date(fechaFin + 'T23:59:59')) return false;
-        }
-        if (horaInicio) {
-          const [h, m] = horaInicio.split(':').map(Number);
-          if (fh.getHours() * 60 + fh.getMinutes() < h * 60 + m) return false;
-        }
-        if (horaFin) {
-          const [h, m] = horaFin.split(':').map(Number);
-          if (fh.getHours() * 60 + fh.getMinutes() > h * 60 + m) return false;
-        }
-        return true;
-      });
+    if (fechaInicio || fechaFin) {
+      // Con fechas: solo Dolphin histórico, sin fallback que confunda resultados
+      return this.findCercanosPorPunto(lat, lng, metros, fechaInicio!, fechaFin!, horaInicio, horaFin);
     }
 
+    // Sin filtro de fecha: posición actual + haversine
+    const all = await this.findAll();
+    const resultado: any[] = [];
+    for (const u of all) {
+      const distancia = this.haversineMetros(lat, lng, u.latitud, u.longitud);
+      if (distancia <= metros) resultado.push({ ...u, distancia_metros: distancia });
+    }
+    return resultado.sort((a, b) => a.distancia_metros - b.distancia_metros);
+  }
+
+  // Fallback cuando Dolphin no responde: muestra radios actualmente cercanos al punto.
+  // No filtra por hora porque fechaHora es la posición *actual*, no histórica.
+  private async findCercanosConFiltroFecha(
+    lat: number, lng: number, metros: number,
+  ) {
+    const all = await this.findAll();
     return all.filter((u) => {
-      const R = 6371000;
-      const dLat = ((u.latitud - lat) * Math.PI) / 180;
-      const dLng = ((u.longitud - lng) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos((lat * Math.PI) / 180) * Math.cos((u.latitud * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-      const distancia = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      (u as any).distancia_metros = Math.round(distancia);
-      return distancia <= metros;
+      const distancia = this.haversineMetros(lat, lng, u.latitud, u.longitud);
+      if (distancia > metros) return false;
+      (u as any).distancia_metros = distancia;
+      return true;
     }).sort((a, b) => (a as any).distancia_metros - (b as any).distancia_metros);
+  }
+
+  private async findCercanosPorPunto(
+    lat: number, lng: number, metros: number,
+    fechaInicio: string, fechaFin: string,
+    horaInicio?: string, horaFin?: string,
+  ) {
+    const token = await this.getToken();
+    let desde = this.toDolphinDateTime(fechaInicio, horaInicio || '00:00');
+    let hasta = this.toDolphinDateTime(fechaFin, horaFin || '23:59');
+    // Si el rango está invertido, intercambiar
+    if (new Date(desde.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1')) >
+        new Date(hasta.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1'))) {
+      [desde, hasta] = [hasta, desde];
+    }
+
+    const boundary = '----FormBoundary' + Math.random().toString(16).slice(2);
+    const fields: Record<string, string> = {
+      vempresa: '35',
+      vlatitud: String(lng),  // Dolphin tiene lat/lng invertidos
+      vlongitud: String(lat),
+      vdesde: desde,
+      vhasta: hasta,
+      vmetros: String(metros),
+    };
+    const formBody = Object.entries(fields)
+      .map(([k, v]) => `--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}`)
+      .join('\r\n') + `\r\n--${boundary}--\r\n`;
+
+    console.log('[buscar_radios_por_punto] params:', { vlatitud: fields.vlatitud, vlongitud: fields.vlongitud, vdesde: fields.vdesde, vhasta: fields.vhasta, vmetros: fields.vmetros });
+
+    const res = await httpsRequest(`${DOLPHIN_BASE_URL}/buscar_radios_por_punto`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': Buffer.byteLength(formBody),
+      },
+    }, formBody, 60000);
+
+    console.log('[buscar_radios_por_punto] status:', res.status, 'data length:', res.data.length);
+
+    if (res.status < 200 || res.status >= 300) {
+      this.cachedToken = null;
+      throw new InternalServerErrorException('Error al buscar radios por punto en Dolphin');
+    }
+
+    const raw = JSON.parse(res.data) as any[];
+    console.log('[buscar_radios_por_punto] radios encontrados por Dolphin:', raw.length, raw.map(r => r._radio));
+
+    // Enriquecer con metadata de todos los radios (incluidos offline sin GPS)
+    await this.findAll(); // asegura que cachedUnitsAll esté poblado
+    const unitMap = new Map((this.cachedUnitsAll ?? []).map(u => [Number(u.issi), u]));
+
+    return raw.map((r) => {
+      const unit = unitMap.get(Number(r._radio));
+      return {
+        issi: r._radio,
+        unicocodigo: r._codigo || unit?.unicocodigo || '',
+        descripcion: r._descripcion || '',
+        tipo: r._tipo || unit?.tipo || '',
+        idUnidad: r._tipounidad ?? unit?.idUnidad,
+        estado: unit?.estado || '',
+        estadoRadar: unit?.estadoRadar || '',
+        color: unit?.color || '',
+        hexacolor: unit?.hexacolor || '',
+        latitud: unit?.latitud ?? null,
+        longitud: unit?.longitud ?? null,
+        fechaHora: unit?.fechaHora || '',
+        velocidad: unit?.velocidad ?? 0,
+        direccion: unit?.direccion || '',
+        distancia_metros: unit?.latitud != null
+          ? this.haversineMetros(lat, lng, unit.latitud, unit.longitud)
+          : null,
+      };
+    }).sort((a, b) => (a.distancia_metros ?? Infinity) - (b.distancia_metros ?? Infinity));
   }
 
   async findHistorico(issi: string, fechaInicio: string, horaInicio: string, fechaFin: string, horaFin: string) {
@@ -126,16 +211,35 @@ export class GpsRadioService {
     }
 
     const raw = JSON.parse(res.data) as any[];
+    console.log('[buscar_historico] total puntos raw:', raw.length, raw[0]);
+
     return raw.map((u) => ({
       id: u._id,
-      latitud: u._latitud,   // buscar_historico usa nombres correctos (sin swap)
+      latitud: u._latitud,
       longitud: u._longitud,
-      velocidad: u._vel,
-      fechaHora: u._freg,
+      velocidad: u._vel === 9999 ? 0 : u._vel,  // 9999 = sin dato de velocidad
+      fechaHora: u._freg && u._hreg ? `${u._freg} ${u._hreg}` : (u._freg || ''),
       color: u._color,
+      hexacolor: u._colorhexa,
       estado: u._estdesc,
       tipo: u._tipounidad,
-    })).filter((u) => u.latitud && u.longitud && Math.abs(u.latitud) < 90 && Math.abs(u.longitud) < 180);
+    }))
+    .filter((u) => {
+      if (!u.latitud || !u.longitud) return false;
+      if (u.latitud === 0 || u.longitud === 0) return false;
+      // Limitar a coordenadas válidas de Perú
+      if (u.latitud < -20 || u.latitud > 0) return false;
+      if (u.longitud < -82 || u.longitud > -68) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      // Ordenar cronológicamente combinando fecha + hora de _freg/_hreg
+      const parse = (s: string) => {
+        const m = s.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}:\d{2}:\d{2})/);
+        return m ? new Date(`${m[3]}-${m[2]}-${m[1]}T${m[4]}`).getTime() : 0;
+      };
+      return parse(a.fechaHora) - parse(b.fechaHora);
+    });
   }
 
   async findKmDias(issi: string, fechaInicio: string, fechaFin: string) {
@@ -287,7 +391,7 @@ export class GpsRadioService {
 
     const raw = JSON.parse(res.data) as any[];
 
-    const units = raw.map((u) => ({
+    const mapped = raw.map((u) => ({
       issi: u._issi,
       unicocodigo: u._unicocodigo,
       idUnidad: u._idtunidad,
@@ -302,8 +406,11 @@ export class GpsRadioService {
       fechaHora: u._fechahora,
       velocidad: u._velocidad,
       direccion: u._direccion,
-    })).filter((u) => u.latitud && u.longitud && Math.abs(u.latitud) < 90 && Math.abs(u.longitud) < 180);
+    }));
 
+    // Guardar todos (con y sin GPS) para poder obtener metadata de radios offline
+    this.cachedUnitsAll = mapped;
+    const units = mapped.filter((u) => u.latitud && u.longitud && Math.abs(u.latitud) < 90 && Math.abs(u.longitud) < 180);
     this.cachedUnits = units;
     this.unitsExpiresAt = Date.now() + this.UNITS_TTL_MS;
     return units;
