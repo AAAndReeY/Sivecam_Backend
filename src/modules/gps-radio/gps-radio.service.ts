@@ -1,9 +1,9 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import * as https from 'https';
 
-const DOLPHIN_BASE_URL = 'https://apigps.dolphin.pe';
-const DOLPHIN_USERNAME = 'USRSJL2021';
-const DOLPHIN_PASSWORD = 'usrsjl2026';
+const DOLPHIN_BASE_URL = process.env.DOLPHIN_BASE_URL || 'https://apigps.dolphin.pe';
+const DOLPHIN_USERNAME = process.env.DOLPHIN_USERNAME;
+const DOLPHIN_PASSWORD = process.env.DOLPHIN_PASSWORD;
 
 // Dolphin usa certificado con cadena no reconocida por Node
 const insecureAgent = new https.Agent({ rejectUnauthorized: false });
@@ -49,7 +49,14 @@ export class GpsRadioService {
       throw new InternalServerErrorException('Error al autenticar con API GPS Dolphin');
     }
 
-    const data = JSON.parse(res.data) as { token?: string; access_token?: string };
+    let data: any;
+    try {
+      data = JSON.parse(res.data);
+    } catch (e) {
+      console.error('Error parseando token Dolphin. Respuesta:', res.data);
+      throw new InternalServerErrorException('La API Dolphin devolvió un formato inválido (posible error SQL interno).');
+    }
+
     const token = data.token ?? data.access_token;
     if (!token) throw new InternalServerErrorException('Token no recibido de API GPS Dolphin');
 
