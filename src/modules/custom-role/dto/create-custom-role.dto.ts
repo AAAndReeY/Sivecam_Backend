@@ -29,10 +29,17 @@ export class ModulePermissionDto {
   @IsOptional()
   can_delete?: boolean;
 
+  // Campos que el rol ve en la CAPA del mapa
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   visible_fields?: string[];
+
+  // Campos que el rol ve en el MODULO administrativo y su Excel
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  export_fields?: string[];
 }
 
 export class LayerPermissionDto {
