@@ -97,11 +97,15 @@ export class CustomRoleGuard implements CanActivate {
           // Fallback de lectura: módulos que requieren leer catálogos de otro módulo
           const readFallbackMap: Record<string, string[]> = {
             // catálogo requerido → módulos que otorgan acceso de lectura
-            'tipos-incidencia':       ['incidencias-pnp', 'subtipos-incidencia', 'modalidades-incidencia'],
-            'subtipos-incidencia':    ['incidencias-pnp', 'modalidades-incidencia'],
-            'modalidades-incidencia': ['incidencias-pnp'],
+            'tipos-incidencia':       ['incidencias-pnp', 'subtipos-incidencia', 'modalidades-incidencia', 'reportes-incidencias'],
+            'subtipos-incidencia':    ['incidencias-pnp', 'modalidades-incidencia', 'reportes-incidencias'],
+            'modalidades-incidencia': ['incidencias-pnp', 'reportes-incidencias'],
             'comisarias':             ['incidencias-pnp'],
             'roles':                  ['usuarios'],
+            // El modulo de Reportes consolida Serenazgo + PNP: quien puede ver
+            // reportes puede LEER incidencias PNP (crear/editar/borrar siguen
+            // exigiendo el modulo 'incidencias-pnp' propio).
+            'incidencias-pnp':        ['reportes-incidencias'],
           };
           const fallbackParents = readFallbackMap[moduleKey];
           if (fallbackParents) {

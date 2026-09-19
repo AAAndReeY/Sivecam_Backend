@@ -31,9 +31,24 @@ export class CommunalController {
     return this.communalService.findAll(dto, req.user);
   }
 
+  /**
+   * Excel del panel administrativo. Lleva su propio module_key para poder
+   * concederlo a un rol concreto sin darle el resto del panel. Debe declararse
+   * antes de ':id' para que la ruta no se coma la palabra "export".
+   */
+  @ModuleKey('camaras-vecinales-export')
+  @Get('export')
+  exportAll(@Query() dto: FilterCommunalDto, @Req() req: Request) {
+    return this.communalService.exportAll(dto, req.user);
+  }
+
   @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
-    return this.communalService.findOne(id, req.user);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() dto: FilterCommunalDto,
+    @Req() req: Request,
+  ) {
+    return this.communalService.findOne(id, req.user, dto.scope ?? 'map');
   }
 
   @ModuleOp('create')

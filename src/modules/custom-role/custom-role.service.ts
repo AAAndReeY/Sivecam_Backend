@@ -11,7 +11,7 @@ type Caller = { system_slug: string | null; username: string };
 export class CustomRoleService {
   private readonly include = {
     module_permissions: {
-      select: { module_key: true, can_access: true, can_create: true, can_edit: true, can_delete: true, visible_fields: true },
+      select: { module_key: true, can_access: true, can_create: true, can_edit: true, can_delete: true, visible_fields: true, export_fields: true },
     },
     layer_permissions: {
       select: { layer_key: true },
@@ -41,6 +41,7 @@ export class CustomRoleService {
               can_edit:       m.can_edit       ?? false,
               can_delete:     m.can_delete     ?? false,
               visible_fields: m.visible_fields ?? [],
+              export_fields:  m.export_fields  ?? [],
             })),
           },
           layer_permissions: {
@@ -104,6 +105,7 @@ export class CustomRoleService {
                 can_edit:       m.can_edit       ?? false,
                 can_delete:     m.can_delete     ?? false,
                 visible_fields: m.visible_fields ?? [],
+                export_fields:  m.export_fields  ?? [],
               })),
             },
           }),
@@ -284,6 +286,9 @@ export class CustomRoleService {
           : m === 'camaras-vecinales'
             ? (def.cameraFields?.vecinal ?? [])
             : [],
+        // Vacio = sin restriccion en el panel administrativo. Se afina por rol
+        // desde Gestion de Roles; el acceso al Excel va por 'camaras-vecinales-export'.
+        export_fields: [],
       }));
 
       // Buscar por system_slug o nombre
