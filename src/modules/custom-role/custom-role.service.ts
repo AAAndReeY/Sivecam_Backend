@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { SessionEventsService } from '../session-events';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
 import { CreateCustomRoleDto, FilterCustomRoleDto, UpdateCustomRoleDto } from './dto';
 
@@ -22,6 +23,7 @@ export class CustomRoleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly sessionEvents: SessionEventsService,
   ) {}
 
   async create(dto: CreateCustomRoleDto, caller?: Caller) {
@@ -127,6 +129,7 @@ export class CustomRoleService {
         performed_by: caller?.username,
       });
 
+      await this.sessionEvents.notifyRoleChanged(id);
       return role;
     } catch (e) {
       this.handlePrismaError(e);
@@ -148,6 +151,7 @@ export class CustomRoleService {
       changes: { name: role.name },
       performed_by: caller?.username,
     });
+    await this.sessionEvents.notifyRoleChanged(id);
     return { action, id };
   }
 
@@ -341,6 +345,8 @@ export class CustomRoleService {
       }
     }
 
+    // Los roles base se re-sincronizaron: todos los conectados recargan permisos
+    this.sessionEvents.notifyPermsChanged();
     return { created: Object.keys(createdIds).length };
   }
 

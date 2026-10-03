@@ -25,6 +25,7 @@ import { IncidenceModalityModule } from './modules/incidence-modality/incidence-
 import { CampaignPointModule } from './modules/campaign-point/campaign-point.module';
 import { GpsRadioModule } from './modules/gps-radio/gps-radio.module';
 import { GpsZonaModule } from './modules/gps-zona/gps-zona.module';
+import { SessionEventsModule } from './modules/session-events';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { GpsZonaModule } from './modules/gps-zona/gps-zona.module';
     IncidenceModule,
     MunicipalModule,
     PrismaModule,
+    SessionEventsModule,
     StopModule,
     SqlModule,
     TypologyModule,

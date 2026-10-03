@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-}
+}que mrd de sti
 
 datasource db {
   provider = "postgresql"
@@ -189,11 +189,26 @@ model User {
   dni                   String?               @unique
   phone                 String?               @unique
   token                 String?
+  max_sessions          Int                   @default(1)
   custom_role_id        String
   custom_role           CustomRole            @relation(fields: [custom_role_id], references: [id])
+  sessions              UserSession[]
   created_at            DateTime              @default(now())
   updated_at            DateTime              @updatedAt
   deleted_at            DateTime?
+}
+
+model UserSession {
+  id                    String                @id @default(uuid())
+  user_id               String
+  user                  User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_agent            String?
+  ip                    String?
+  created_at            DateTime              @default(now())
+  revoked_at            DateTime?
+  revoked_reason        String?
+
+  @@index([user_id])
 }
 
 model CustomRole {

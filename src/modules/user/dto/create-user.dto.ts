@@ -1,11 +1,14 @@
 import {
   IsEmail,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -51,4 +54,11 @@ export class CreateUserDto {
   @IsUUID()
   @IsNotEmpty()
   custom_role_id: string;
+
+  // Sesiones simultáneas permitidas. Si no se envía: 50 para OPERATOR, 1 para el resto.
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  @IsOptional()
+  max_sessions?: number;
 }
