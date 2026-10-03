@@ -5,6 +5,7 @@ import {
   CallHandler,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { SSE_METADATA } from '@nestjs/common/constants';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
@@ -17,6 +18,8 @@ export class ResponseInterceptor implements NestInterceptor {
     const request = ctx.switchToHttp().getRequest();
     const method = (request?.method || 'GET').toUpperCase();
     if (response.headersSent) return next.handle();
+    // Los eventos SSE se envían tal cual, sin el envoltorio { message, data }
+    if (this.reflector.get(SSE_METADATA, ctx.getHandler())) return next.handle();
     const SUCCESS_MESSAGE_KEY = 'success_message';
     const customMessage = this.reflector.getAllAndOverride<string>(
       SUCCESS_MESSAGE_KEY,

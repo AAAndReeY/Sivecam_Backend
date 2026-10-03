@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { CreateUserDto, FilterUserDto, UpdateUserDto } from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { SESSION_LIMIT_REDUCED, SessionEventsService, USER_DISABLED } from '../session-events';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
 
 type Caller = { system_slug: string | null; username: string };
@@ -19,6 +20,7 @@ export class UserService {
     email: true,
     dni: true,
     phone: true,
+    max_sessions: true,
     custom_role_id: true,
     custom_role: {
       select: { id: true, name: true, system_slug: true },
@@ -29,6 +31,7 @@ export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly sessionEvents: SessionEventsService,
   ) {}
 
   async create(dto: CreateUserDto, caller?: Caller): Promise<User> {
@@ -47,6 +50,7 @@ export class UserService {
       const user = await this.prisma.user.create({
         data: {
           ...res,
+          max_sessions: res.max_sessions ?? (customRole.system_slug === 'OPERATOR' ? 50 : 1),
           password: bcrypt.hashSync(password, 10),
           created_at: timezoneHelper(),
           updated_at: timezoneHelper(),
@@ -135,6 +139,14 @@ export class UserService {
       performed_by: caller?.username,
     });
 
+    // Aplicar al instante en los dispositivos del usuario afectado
+    if (changes['max_sessions'] && res.max_sessions! < target.max_sessions) {
+      await this.sessionEvents.enforceSessionLimit(id, res.max_sessions!, SESSION_LIMIT_REDUCED);
+    }
+    if (changes['custom_role_id']) {
+      this.sessionEvents.notifyPermsChanged([id]);
+    }
+
     return await this.getUserById(id);
   }
 
@@ -149,6 +161,8 @@ export class UserService {
       data: { updated_at: timezoneHelper(), deleted_at },
       where: { id },
     });
+
+    if (!inactive) await this.sessionEvents.revokeAllForUser(id, USER_DISABLED);
 
     const action = inactive ? 'RESTORE' : 'DELETE';
     await this.audit.log({
