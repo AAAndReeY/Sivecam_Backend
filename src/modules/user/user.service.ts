@@ -5,7 +5,13 @@ import * as bcrypt from 'bcrypt';
 import { CreateUserDto, FilterUserDto, UpdateUserDto } from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { SESSION_LIMIT_REDUCED, SessionEventsService, USER_DISABLED } from '../session-events';
+import {
+  DEVICE_RESET,
+  MOBILE_ONLY_ENABLED,
+  SESSION_LIMIT_REDUCED,
+  SessionEventsService,
+  USER_DISABLED,
+} from '../session-events';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
 
 type Caller = { system_slug: string | null; username: string };
@@ -21,6 +27,9 @@ export class UserService {
     dni: true,
     phone: true,
     max_sessions: true,
+    mobile_only: true,
+    device_info: true,
+    device_bound_at: true,
     custom_role_id: true,
     custom_role: {
       select: { id: true, name: true, system_slug: true },
@@ -50,7 +59,7 @@ export class UserService {
       const user = await this.prisma.user.create({
         data: {
           ...res,
-          max_sessions: res.max_sessions ?? (customRole.system_slug === 'OPERATOR' ? 50 : 1),
+          max_sessions: res.mobile_only ? 1 : res.max_sessions ?? (customRole.system_slug === 'OPERATOR' ? 50 : 1),
           password: bcrypt.hashSync(password, 10),
           created_at: timezoneHelper(),
           updated_at: timezoneHelper(),
@@ -60,7 +69,13 @@ export class UserService {
         action: 'CREATE',
         entity: 'User',
         entity_id: user.id,
-        changes: { username: dto.username, custom_role: customRole.name, name: dto.name, lastname: dto.lastname },
+        changes: {
+          username: dto.username,
+          custom_role: customRole.name,
+          name: dto.name,
+          lastname: dto.lastname,
+          ...(dto.mobile_only && { mobile_only: true }),
+        },
         performed_by: caller?.username,
       });
       return await this.getUserById(user.id);
@@ -114,6 +129,8 @@ export class UserService {
     }
 
     const { password, ...res } = dto;
+    // "Solo app móvil" implica una única sesión (un solo celular vinculado)
+    if (res.mobile_only ?? target.mobile_only) res.max_sessions = 1;
     const data: any = { ...res, updated_at: timezoneHelper() };
     if (password) data.password = bcrypt.hashSync(password, 10);
 
@@ -140,7 +157,10 @@ export class UserService {
     });
 
     // Aplicar al instante en los dispositivos del usuario afectado
-    if (changes['max_sessions'] && res.max_sessions! < target.max_sessions) {
+    if (changes['mobile_only'] && res.mobile_only) {
+      // Las sesiones abiertas (web o sin firma) dejan de valer: debe entrar por la app
+      await this.sessionEvents.revokeAllForUser(id, MOBILE_ONLY_ENABLED);
+    } else if (changes['max_sessions'] && res.max_sessions! < target.max_sessions) {
       await this.sessionEvents.enforceSessionLimit(id, res.max_sessions!, SESSION_LIMIT_REDUCED);
     }
     if (changes['custom_role_id']) {
@@ -174,6 +194,31 @@ export class UserService {
     });
 
     return { action: inactive ? 'Restore' : 'Delete', id };
+  }
+
+  // Desvincula el celular: el próximo login desde la app vincula el nuevo equipo
+  async resetDevice(id: string, caller?: Caller) {
+    const target = await this.getUserById(id);
+    if (target.custom_role?.system_slug === 'SUPERADMIN' && caller?.system_slug !== 'SUPERADMIN') {
+      throw new ForbiddenException('Solo un Superadmin puede modificar cuentas Superadmin');
+    }
+    await this.prisma.user.update({
+      data: { device_public_key: null, device_info: null, device_bound_at: null, updated_at: timezoneHelper() },
+      where: { id },
+    });
+    await this.sessionEvents.revokeAllForUser(id, DEVICE_RESET);
+    await this.audit.log({
+      action: 'DEVICE_RESET',
+      entity: 'User',
+      entity_id: id,
+      changes: {
+        target_username: target.username,
+        previous_device: target.device_info ?? null,
+        previous_bound_at: target.device_bound_at ?? null,
+      },
+      performed_by: caller?.username,
+    });
+    return await this.getUserById(id);
   }
 
   private handlePrismaError(e: any): never {

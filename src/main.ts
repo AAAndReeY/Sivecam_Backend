@@ -11,8 +11,18 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'log', 'verbose', 'warn'],
   });
+  const config = app.get(ConfigService);
+  const logger = new Logger('Bootstrap');
+  // Orígenes permitidos separados por comas (ej. https://mapa.munisjl.gob.pe).
+  // Sin configurar se mantiene abierto para no romper despliegues existentes.
+  const corsOrigins = (config.get<string>('CORS_ORIGINS') ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  if (!corsOrigins.length)
+    logger.warn('CORS_ORIGINS no configurado: CORS abierto a cualquier origen');
   app.enableCors({
-    origin: '*',
+    origin: corsOrigins.length ? corsOrigins : '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
@@ -28,10 +38,8 @@ async function bootstrap() {
     }),
   );
   app.setGlobalPrefix('api');
-  const config = app.get(ConfigService);
   const port = config.get<number>('PORT') || 3000;
   await app.listen(port);
-  const logger = new Logger('Bootstrap');
   logger.verbose(`Server running on port ${port}`);
 }
 bootstrap();

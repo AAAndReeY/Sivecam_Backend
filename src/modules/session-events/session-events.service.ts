@@ -7,12 +7,18 @@ export const SESSION_REPLACED = 'SESSION_REPLACED';
 export const SESSION_REPLACED_MESSAGE = 'Se inició sesión con tu usuario en otro dispositivo';
 export const SESSION_LIMIT_REDUCED = 'SESSION_LIMIT_REDUCED';
 export const USER_DISABLED = 'USER_DISABLED';
+export const DEVICE_RESET = 'DEVICE_RESET';
+export const MOBILE_ONLY_ENABLED = 'MOBILE_ONLY_ENABLED';
+export const REFRESH_REUSED = 'REFRESH_REUSED';
 
 // Mensajes que recibe el dispositivo cuyo token queda revocado
 export const REVOKE_MESSAGES: Record<string, string> = {
   [SESSION_REPLACED]: SESSION_REPLACED_MESSAGE,
   [SESSION_LIMIT_REDUCED]: 'Se redujo el límite de sesiones de tu usuario',
   [USER_DISABLED]: 'Tu usuario fue desactivado',
+  [DEVICE_RESET]: 'El administrador restableció la vinculación de tu dispositivo',
+  [MOBILE_ONLY_ENABLED]: 'Tu usuario ahora solo puede ingresar desde la app móvil autorizada',
+  [REFRESH_REUSED]: 'Tu sesión se cerró por seguridad, vuelve a ingresar',
 };
 
 type Channel = { user_id: string; subject: Subject<MessageEvent> };
@@ -59,14 +65,17 @@ export class SessionEventsService {
     }
   }
 
-  // Deja como máximo `max` sesiones activas (las más recientes) y revoca el resto
-  async enforceSessionLimit(user_id: string, max: number, reason: string) {
+  // Deja como máximo `max` sesiones activas (las más recientes) y revoca el resto.
+  // `keep_id` (la sesión recién creada en el login) se conserva siempre: created_at tiene
+  // precisión de segundos y dos logins en el mismo segundo no se pueden ordenar por fecha.
+  async enforceSessionLimit(user_id: string, max: number, reason: string, keep_id?: string) {
     const active = await this.prisma.userSession.findMany({
-      where: { user_id, revoked_at: null },
+      where: { user_id, revoked_at: null, ...(keep_id && { NOT: { id: keep_id } }) },
       orderBy: { created_at: 'desc' },
       select: { id: true },
     });
-    await this.revokeSessions(active.slice(Math.max(1, max)).map((s) => s.id), reason);
+    const allowed = Math.max(1, max) - (keep_id ? 1 : 0);
+    await this.revokeSessions(active.slice(allowed).map((s) => s.id), reason);
   }
 
   async revokeAllForUser(user_id: string, reason: string) {
