@@ -29,9 +29,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         user_id: true,
         revoked_at: true,
         revoked_reason: true,
+        is_mobile: true,
         user: {
           select: {
             username: true,
+            mobile_only: true,
             custom_role_id: true,
             custom_role: {
               select: {
@@ -57,6 +59,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Sesión finalizada, vuelva a ingresar');
     }
     const { user } = session;
+    // Usuario "solo app móvil": una sesión que no se abrió con firma del dispositivo no vale
+    if (user.mobile_only && !session.is_mobile)
+      throw new UnauthorizedException({
+        statusCode: 401,
+        code: 'MOBILE_ONLY',
+        message: 'Este usuario solo puede ingresar desde la app móvil autorizada',
+      });
     return {
       user_id: sub,
       session_id: sid,

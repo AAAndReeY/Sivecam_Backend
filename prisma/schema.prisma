@@ -190,6 +190,11 @@ model User {
   phone                 String?               @unique
   token                 String?
   max_sessions          Int                   @default(1)
+  // Solo puede ingresar desde la app móvil vinculada (firma con llave del Keystore)
+  mobile_only           Boolean               @default(false)
+  device_public_key     String?
+  device_info           String?
+  device_bound_at       DateTime?
   custom_role_id        String
   custom_role           CustomRole            @relation(fields: [custom_role_id], references: [id])
   sessions              UserSession[]
@@ -207,8 +212,25 @@ model UserSession {
   created_at            DateTime              @default(now())
   revoked_at            DateTime?
   revoked_reason        String?
+  // Sesión iniciada desde la app móvil con firma del dispositivo
+  is_mobile             Boolean               @default(false)
+  refresh_token_hash    String?
+  refresh_expires_at    DateTime?
 
   @@index([user_id])
+}
+
+// Reto de un solo uso que la app firma con la llave del dispositivo (login / refresh)
+model DeviceChallenge {
+  id                    String                @id @default(uuid())
+  username              String
+  purpose               String
+  nonce                 String
+  expires_at            DateTime
+  used_at               DateTime?
+  created_at            DateTime              @default(now())
+
+  @@index([expires_at])
 }
 
 model CustomRole {

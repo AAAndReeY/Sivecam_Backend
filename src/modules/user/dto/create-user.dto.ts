@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsInt,
   IsNotEmpty,
@@ -61,4 +62,9 @@ export class CreateUserDto {
   @Max(500)
   @IsOptional()
   max_sessions?: number;
+
+  // Solo puede ingresar desde la app móvil vinculada (fuerza 1 sesión)
+  @IsBoolean()
+  @IsOptional()
+  mobile_only?: boolean;
 }

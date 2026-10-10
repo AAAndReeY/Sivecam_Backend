@@ -43,6 +43,19 @@ export class CustomRoleGuard implements CanActivate {
             });
             if (hasPnpAccess) return true;
           }
+          // Fallback: la lista de bodycams también la usan la capa de rutas y el
+          // panel de gestión de bodycams
+          if (layerKey === 'bodycams' && operation === 'read') {
+            const [rutasLayer, gestion] = await Promise.all([
+              this.prisma.roleLayerPermission.findFirst({
+                where: { custom_role_id: user.custom_role_id, layer_key: 'rutasBodycams' },
+              }),
+              this.prisma.roleModulePermission.findFirst({
+                where: { custom_role_id: user.custom_role_id, module_key: 'bodycams', can_access: true },
+              }),
+            ]);
+            if (rutasLayer || gestion) return true;
+          }
           // Fallback: la capa agregada 'robos' se cumple si el usuario tiene acceso al dashboard
           // de serenos O tiene cualquier capa individual de incidencia asignada
           if (layerKey === 'robos' && operation === 'read') {

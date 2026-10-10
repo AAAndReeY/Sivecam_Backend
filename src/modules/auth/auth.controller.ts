@@ -1,6 +1,6 @@
-import { Controller, Post, Body, Req, UseGuards, Sse, Query } from '@nestjs/common';
+import { Controller, Post, Body, Req, UseGuards, Sse, Query, HttpCode } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto';
+import { DeviceChallengeDto, LoginDto, RefreshTokenDto } from './dto';
 import { JwtAuthGuard } from './guard';
 import { SuccessMessage } from './decorators';
 
@@ -15,6 +15,22 @@ export class AuthController {
       user_agent: req.headers['user-agent'],
       ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip,
     });
+  }
+
+  // Reto que la app móvil firma con la llave del dispositivo antes del login o refresh
+  @Post('device/challenge')
+  @HttpCode(200)
+  @SuccessMessage('Reto generado')
+  deviceChallenge(@Body() dto: DeviceChallengeDto) {
+    return this.authService.createChallenge(dto);
+  }
+
+  // Renueva el access token de una sesión móvil (refresh token + firma del dispositivo)
+  @Post('refresh')
+  @HttpCode(200)
+  @SuccessMessage('Token renovado')
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refresh(dto);
   }
 
   @Sse('session-events')
