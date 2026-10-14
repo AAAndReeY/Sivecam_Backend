@@ -17,6 +17,7 @@ import { JwtPayload } from './interfaces';
 import { timezoneHelper } from '../../common/helpers';
 import { AuditService } from '../audit/audit.service';
 import {
+  OUT_OF_SCHEDULE,
   REFRESH_REUSED,
   REVOKE_MESSAGES,
   SESSION_REPLACED,
@@ -38,6 +39,7 @@ import {
   verifyAndroidAttestation,
 } from './device/android-attestation';
 import { GOOGLE_ATTESTATION_ROOTS_PEM } from './device/google-attestation-roots';
+import { checkSchedule, outOfScheduleMessage } from './access-schedule';
 
 const CHALLENGE_TTL_MS = 2 * 60 * 1000;
 
@@ -97,6 +99,9 @@ export class AuthService {
         max_sessions: true,
         mobile_only: true,
         device_public_key: true,
+        access_start: true,
+        access_end: true,
+        access_days: true,
         custom_role_id: true,
         custom_role: { select: { name: true, system_slug: true } },
       },
@@ -104,6 +109,10 @@ export class AuthService {
     if (!user || !(await bcrypt.compare(password, user.password)))
       throw new UnauthorizedException('Credenciales inválidas');
     const { id } = user;
+
+    // Horario de acceso: fuera de su horario no puede ingresar
+    if (!checkSchedule(user).allowed)
+      throw deviceError(ForbiddenException, 403, OUT_OF_SCHEDULE, outOfScheduleMessage(user));
 
     // Usuarios "solo app móvil": además de la contraseña, deben firmar el reto con la
     // llave del celular vinculado (la web no tiene esa llave y queda rechazada)
@@ -190,7 +199,17 @@ export class AuthService {
         revoked_reason: true,
         refresh_token_hash: true,
         refresh_expires_at: true,
-        user: { select: { username: true, deleted_at: true, mobile_only: true, device_public_key: true } },
+        user: {
+          select: {
+            username: true,
+            deleted_at: true,
+            mobile_only: true,
+            device_public_key: true,
+            access_start: true,
+            access_end: true,
+            access_days: true,
+          },
+        },
       },
     });
     if (!session || !session.is_mobile || !session.refresh_token_hash) throw ended();
@@ -208,6 +227,10 @@ export class AuthService {
       throw ended('SESSION_EXPIRED', 'Tu sesión expiró, vuelve a ingresar');
     const { user } = session;
     if (user.deleted_at || !user.mobile_only || !user.device_public_key) throw ended();
+    if (!checkSchedule(user).allowed) {
+      await this.sessionChannel.revokeSessions([session.id], OUT_OF_SCHEDULE);
+      throw ended(OUT_OF_SCHEDULE, outOfScheduleMessage(user));
+    }
 
     const nonce = await this.consumeChallenge(dto.challenge_id, user.username, 'refresh');
     if (!verifySignature(user.device_public_key, challengeMessage('refresh', user.username, nonce), dto.signature))
@@ -260,7 +283,7 @@ export class AuthService {
             revoked_at: true,
             revoked_reason: true,
             is_mobile: true,
-            user: { select: { mobile_only: true } },
+            user: { select: { mobile_only: true, access_start: true, access_end: true, access_days: true } },
           },
         })
       : null;
@@ -272,6 +295,11 @@ export class AuthService {
     }
     if (session.user.mobile_only && !session.is_mobile)
       return ended('MOBILE_ONLY', MOBILE_ONLY_MSG);
+    // Al terminar el horario, SessionEventsService.sweepSchedules cierra esta conexión
+    if (!checkSchedule(session.user).allowed) {
+      await this.sessionChannel.revokeSessions([payload.sid], OUT_OF_SCHEDULE);
+      return ended(OUT_OF_SCHEDULE, outOfScheduleMessage(session.user));
+    }
 
     const stream = this.sessionChannel.subscribe(payload.sid, payload.sub);
     if (!payload.exp) return stream;

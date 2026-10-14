@@ -1,7 +1,8 @@
-import { Injectable, MessageEvent } from '@nestjs/common';
+import { Injectable, Logger, MessageEvent, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Observable, Subject, interval, map, merge } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { timezoneHelper } from '../../common/helpers';
+import { checkSchedule } from '../auth/access-schedule';
 
 export const SESSION_REPLACED = 'SESSION_REPLACED';
 export const SESSION_REPLACED_MESSAGE = 'Se inició sesión con tu usuario en otro dispositivo';
@@ -10,6 +11,7 @@ export const USER_DISABLED = 'USER_DISABLED';
 export const DEVICE_RESET = 'DEVICE_RESET';
 export const MOBILE_ONLY_ENABLED = 'MOBILE_ONLY_ENABLED';
 export const REFRESH_REUSED = 'REFRESH_REUSED';
+export const OUT_OF_SCHEDULE = 'OUT_OF_SCHEDULE';
 
 // Mensajes que recibe el dispositivo cuyo token queda revocado
 export const REVOKE_MESSAGES: Record<string, string> = {
@@ -19,6 +21,7 @@ export const REVOKE_MESSAGES: Record<string, string> = {
   [DEVICE_RESET]: 'El administrador restableció la vinculación de tu dispositivo',
   [MOBILE_ONLY_ENABLED]: 'Tu usuario ahora solo puede ingresar desde la app móvil autorizada',
   [REFRESH_REUSED]: 'Tu sesión se cerró por seguridad, vuelve a ingresar',
+  [OUT_OF_SCHEDULE]: 'Tu horario de acceso terminó',
 };
 
 type Channel = { user_id: string; subject: Subject<MessageEvent> };
@@ -27,11 +30,41 @@ type Channel = { user_id: string; subject: Subject<MessageEvent> };
 // sesiones revocadas y cambios de permisos.
 // Nota: vive en el proceso; si el backend corre en varias instancias, cada una solo
 // avisa a los dispositivos conectados a ella (el resto se entera en su siguiente petición).
+// Cada cuánto se revisa si los usuarios conectados siguen dentro de su horario de acceso
+const SCHEDULE_SWEEP_MS = 30_000;
+
 @Injectable()
-export class SessionEventsService {
+export class SessionEventsService implements OnModuleInit, OnModuleDestroy {
   private channels = new Map<string, Channel>();
+  private sweepTimer?: NodeJS.Timeout;
+  private readonly logger = new Logger(SessionEventsService.name);
 
   constructor(private readonly prisma: PrismaService) {}
+
+  onModuleInit() {
+    this.sweepTimer = setInterval(() => {
+      this.sweepSchedules().catch((e) => this.logger.error(`Revisión de horarios: ${e?.message ?? e}`));
+    }, SCHEDULE_SWEEP_MS);
+    this.sweepTimer.unref();
+  }
+
+  onModuleDestroy() {
+    clearInterval(this.sweepTimer);
+  }
+
+  // Cierra al instante (máx. 30 s de demora) las sesiones conectadas cuyo horario terminó.
+  // Las que no están conectadas se cierran en su siguiente petición (JwtStrategy).
+  async sweepSchedules() {
+    const user_ids = [...new Set([...this.channels.values()].map((c) => c.user_id))];
+    if (!user_ids.length) return;
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: user_ids }, access_start: { not: null }, access_end: { not: null } },
+      select: { id: true, access_start: true, access_end: true, access_days: true },
+    });
+    for (const user of users) {
+      if (!checkSchedule(user).allowed) await this.revokeAllForUser(user.id, OUT_OF_SCHEDULE);
+    }
+  }
 
   subscribe(session_id: string, user_id: string): Observable<MessageEvent> {
     this.channels.get(session_id)?.subject.complete();

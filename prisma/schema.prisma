@@ -195,6 +195,11 @@ model User {
   device_public_key     String?
   device_info           String?
   device_bound_at       DateTime?
+  // Horario de acceso (hora de Lima, "HH:MM"). Ambos null = sin restricción.
+  // access_days: 1 = lunes … 7 = domingo (día en que empieza el turno)
+  access_start          String?               @db.VarChar(5)
+  access_end            String?               @db.VarChar(5)
+  access_days           Int[]                 @default([])
   custom_role_id        String
   custom_role           CustomRole            @relation(fields: [custom_role_id], references: [id])
   sessions              UserSession[]

@@ -8,11 +8,13 @@ import { AuditService } from '../audit/audit.service';
 import {
   DEVICE_RESET,
   MOBILE_ONLY_ENABLED,
+  OUT_OF_SCHEDULE,
   SESSION_LIMIT_REDUCED,
   SessionEventsService,
   USER_DISABLED,
 } from '../session-events';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
+import { AccessSchedule, checkSchedule, hasSchedule } from '../auth/access-schedule';
 
 type Caller = { system_slug: string | null; username: string };
 
@@ -30,6 +32,9 @@ export class UserService {
     mobile_only: true,
     device_info: true,
     device_bound_at: true,
+    access_start: true,
+    access_end: true,
+    access_days: true,
     custom_role_id: true,
     custom_role: {
       select: { id: true, name: true, system_slug: true },
@@ -55,6 +60,7 @@ export class UserService {
     }
 
     const { password, ...res } = dto;
+    Object.assign(res, this.normalizeSchedule(res));
     try {
       const user = await this.prisma.user.create({
         data: {
@@ -75,6 +81,7 @@ export class UserService {
           name: dto.name,
           lastname: dto.lastname,
           ...(dto.mobile_only && { mobile_only: true }),
+          ...(hasSchedule(res) && { access_start: res.access_start, access_end: res.access_end, access_days: res.access_days }),
         },
         performed_by: caller?.username,
       });
@@ -129,6 +136,8 @@ export class UserService {
     }
 
     const { password, ...res } = dto;
+    if (res.access_start !== undefined || res.access_end !== undefined || res.access_days !== undefined)
+      Object.assign(res, this.normalizeSchedule(res, target));
     // "Solo app móvil" implica una única sesión (un solo celular vinculado)
     if (res.mobile_only ?? target.mobile_only) res.max_sessions = 1;
     const data: any = { ...res, updated_at: timezoneHelper() };
@@ -165,6 +174,11 @@ export class UserService {
     }
     if (changes['custom_role_id']) {
       this.sessionEvents.notifyPermsChanged([id]);
+    }
+    // Nuevo horario que ya no incluye la hora actual: se cierran sus sesiones abiertas
+    if (changes['access_start'] || changes['access_end'] || changes['access_days']) {
+      const updated = await this.getUserById(id);
+      if (!checkSchedule(updated).allowed) await this.sessionEvents.revokeAllForUser(id, OUT_OF_SCHEDULE);
     }
 
     return await this.getUserById(id);
@@ -219,6 +233,21 @@ export class UserService {
       performed_by: caller?.username,
     });
     return await this.getUserById(id);
+  }
+
+  // Valida el horario combinando lo enviado con lo que ya tiene el usuario
+  private normalizeSchedule(dto: Partial<AccessSchedule>, current?: AccessSchedule): AccessSchedule {
+    const pick = <K extends keyof AccessSchedule>(k: K) => (dto[k] !== undefined ? dto[k] : current?.[k]) ?? null;
+    const access_start = pick('access_start') as string | null;
+    const access_end = pick('access_end') as string | null;
+    if (!access_start && !access_end) return { access_start: null, access_end: null, access_days: [] };
+    if (!access_start || !access_end)
+      throw new BadRequestException('Indica la hora de inicio y la hora de fin del horario de acceso');
+    if (access_start === access_end)
+      throw new BadRequestException('La hora de inicio y la de fin del horario no pueden ser iguales');
+    const access_days = [...new Set((pick('access_days') as number[] | null) ?? [])].sort((a, b) => a - b);
+    if (!access_days.length) throw new BadRequestException('Marca al menos un día del horario de acceso');
+    return { access_start, access_end, access_days };
   }
 
   private handlePrismaError(e: any): never {
