@@ -1,4 +1,7 @@
 import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsEmail,
   IsInt,
@@ -12,6 +15,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { TIME_RE } from '../../auth/access-schedule';
 
 export class CreateUserDto {
   @IsString()
@@ -67,4 +71,24 @@ export class CreateUserDto {
   @IsBoolean()
   @IsOptional()
   mobile_only?: boolean;
+
+  // Horario de acceso (hora de Lima, "HH:MM"). null en ambos = sin restricción.
+  // Si access_end <= access_start el turno termina al día siguiente.
+  @Matches(TIME_RE, { message: 'access_start debe tener el formato HH:MM' })
+  @IsOptional()
+  access_start?: string | null;
+
+  @Matches(TIME_RE, { message: 'access_end debe tener el formato HH:MM' })
+  @IsOptional()
+  access_end?: string | null;
+
+  // Días permitidos: 1 = lunes … 7 = domingo
+  @IsArray()
+  @ArrayMaxSize(7)
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(7, { each: true })
+  @IsOptional()
+  access_days?: number[];
 }
