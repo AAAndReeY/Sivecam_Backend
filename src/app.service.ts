@@ -22,7 +22,7 @@ export class AppService {
   async camarasCercanas(lat: number, lng: number, radio: number) {
     const [municipales, vecinales] = await Promise.all([
       this.prisma.municipal.findMany({
-        where: { deleted_at: null },
+        where: { deleted_at: null, map_hidden: false },
         select: { id: true, name: true, address: true, camera: true, latitude: true, longitude: true },
       }),
       this.prisma.communal.findMany({

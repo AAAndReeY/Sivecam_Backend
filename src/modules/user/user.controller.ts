@@ -48,6 +48,29 @@ export class UserController {
     return this.userService.resetDevice(id, { system_slug: req.user.system_slug, username: req.user.username });
   }
 
+  // Sesiones abiertas del usuario (web y app móvil)
+  @Get(':id/sessions')
+  findSessions(@Param('id', ParseUUIDPipe) id: string, @Request() req) {
+    return this.userService.findSessions(id, req.user.session_id);
+  }
+
+  // Cierra todas las sesiones del usuario
+  @Delete(':id/sessions')
+  @ModuleOp('edit')
+  closeAllSessions(@Param('id', ParseUUIDPipe) id: string, @Request() req) {
+    return this.userService.closeSessions(id, null, { system_slug: req.user.system_slug, username: req.user.username });
+  }
+
+  @Delete(':id/sessions/:sessionId')
+  @ModuleOp('edit')
+  closeSession(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Request() req,
+  ) {
+    return this.userService.closeSessions(id, sessionId, { system_slug: req.user.system_slug, username: req.user.username });
+  }
+
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string, @Request() req) {
     return this.userService.toggleDelete(id, { system_slug: req.user.system_slug, username: req.user.username });

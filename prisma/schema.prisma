@@ -107,6 +107,8 @@ model Municipal {
   radius                Float?
   buttom                Boolean               @default(false)
   megaphone             Boolean               @default(false)
+  // Cámara caída (ej. sin energía): no se dibuja su pin en el mapa, pero sigue contando
+  map_hidden            Boolean               @default(false)
   created_at            DateTime              @default(now())
   updated_at            DateTime              @updatedAt
   deleted_at            DateTime?
@@ -200,6 +202,8 @@ model User {
   access_start          String?               @db.VarChar(5)
   access_end            String?               @db.VarChar(5)
   access_days           Int[]                 @default([])
+  // Muestra el pin de "mi ubicación" en el mapa (lo habilita el administrador)
+  show_location_pin     Boolean               @default(false)
   custom_role_id        String
   custom_role           CustomRole            @relation(fields: [custom_role_id], references: [id])
   sessions              UserSession[]

@@ -18,6 +18,7 @@ import { MunicipalService } from './municipal.service';
 import {
   CreateMunicipalDto,
   FilterMunicipalDto,
+  MapVisibilityDto,
   UpdateMunicipalDto,
 } from './dto';
 import { JwtAuthGuard, CustomRoleGuard, ModuleKey, ModuleOp } from '../auth/guard';
@@ -53,6 +54,17 @@ export class MunicipalController {
     @Body() dto: UpdateMunicipalDto,
   ) {
     return this.municipalService.update(id, dto);
+  }
+
+  // Oculta/muestra el pin de una cámara caída en el mapa de todos los usuarios
+  @ModuleOp('edit')
+  @Patch(':id/map-visibility')
+  setMapVisibility(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: MapVisibilityDto,
+    @Req() req: Request,
+  ) {
+    return this.municipalService.setMapVisibility(id, dto.map_hidden, (req.user as any)?.username);
   }
 
   @ModuleOp('delete')

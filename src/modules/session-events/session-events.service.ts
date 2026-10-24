@@ -12,6 +12,7 @@ export const DEVICE_RESET = 'DEVICE_RESET';
 export const MOBILE_ONLY_ENABLED = 'MOBILE_ONLY_ENABLED';
 export const REFRESH_REUSED = 'REFRESH_REUSED';
 export const OUT_OF_SCHEDULE = 'OUT_OF_SCHEDULE';
+export const ADMIN_LOGOUT = 'ADMIN_LOGOUT';
 
 // Mensajes que recibe el dispositivo cuyo token queda revocado
 export const REVOKE_MESSAGES: Record<string, string> = {
@@ -22,6 +23,7 @@ export const REVOKE_MESSAGES: Record<string, string> = {
   [MOBILE_ONLY_ENABLED]: 'Tu usuario ahora solo puede ingresar desde la app móvil autorizada',
   [REFRESH_REUSED]: 'Tu sesión se cerró por seguridad, vuelve a ingresar',
   [OUT_OF_SCHEDULE]: 'Tu horario de acceso terminó',
+  [ADMIN_LOGOUT]: 'El administrador cerró tu sesión',
 };
 
 type Channel = { user_id: string; subject: Subject<MessageEvent> };
