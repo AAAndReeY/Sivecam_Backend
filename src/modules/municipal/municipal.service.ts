@@ -7,10 +7,12 @@ import {
   UpdateMunicipalDto,
 } from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
 
 // Campos siempre incluidos: posición, identificación y metadata del mapa
-const ALWAYS_INCLUDE = ['id', 'name', 'latitude', 'longitude', 'camera', 'deleted_at', 'created_at', 'updated_at'];
+// map_hidden: el front no dibuja el pin, pero la cámara sigue sumando en los contadores
+const ALWAYS_INCLUDE = ['id', 'name', 'latitude', 'longitude', 'camera', 'map_hidden', 'deleted_at', 'created_at', 'updated_at'];
 
 // Campos derivados: algunos visible_fields activan campos adicionales del modelo
 const FIELD_MAP: Record<string, string[]> = {
@@ -19,7 +21,10 @@ const FIELD_MAP: Record<string, string[]> = {
 
 @Injectable()
 export class MunicipalService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async create(dto: CreateMunicipalDto): Promise<Municipal> {
     const municipal = await this.prisma.municipal.create({
@@ -33,9 +38,10 @@ export class MunicipalService {
   }
 
   async findAll(dto: FilterMunicipalDto, user: any): Promise<any> {
-    const { search, camera, ...pagination } = dto;
+    const { search, camera, map_hidden, ...pagination } = dto;
     const where: any = { deleted_at: null };
     if (camera) where.camera = camera;
+    if (map_hidden) where.map_hidden = map_hidden === 'true';
     if (search)
       where.OR = [
         { address: { contains: search, mode: 'insensitive' } },
@@ -90,6 +96,24 @@ export class MunicipalService {
       },
       where: { id },
     });
+    return await this.getMunicipalById(id);
+  }
+
+  async setMapVisibility(id: string, map_hidden: boolean, performed_by?: string): Promise<Municipal> {
+    const municipal = await this.getMunicipalById(id);
+    if (municipal.map_hidden !== map_hidden) {
+      await this.prisma.municipal.update({
+        data: { map_hidden, updated_at: timezoneHelper() },
+        where: { id },
+      });
+      await this.audit.log({
+        action: map_hidden ? 'MAP_HIDE' : 'MAP_SHOW',
+        entity: 'Municipal',
+        entity_id: id,
+        changes: { name: municipal.name, map_hidden },
+        performed_by,
+      });
+    }
     return await this.getMunicipalById(id);
   }
 

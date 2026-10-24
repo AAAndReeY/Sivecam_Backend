@@ -353,10 +353,13 @@ export class CustomRoleService {
   async getMyPermissions(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { custom_role_id: true },
+      select: { custom_role_id: true, show_location_pin: true },
     });
     if (!user?.custom_role_id) return null;
-    return this.getRoleById(user.custom_role_id);
+    // Opciones propias del usuario (no del rol): viajan aquí para que el front las
+    // refresque con el mismo aviso/polling de permisos
+    const role = await this.getRoleById(user.custom_role_id);
+    return { ...role, show_location_pin: user.show_location_pin };
   }
 
   private async getRoleById(id: string, toggle = false) {

@@ -91,4 +91,9 @@ export class CreateUserDto {
   @Max(7, { each: true })
   @IsOptional()
   access_days?: number[];
+
+  // Muestra el pin de "mi ubicación" en el mapa
+  @IsBoolean()
+  @IsOptional()
+  show_location_pin?: boolean;
 }

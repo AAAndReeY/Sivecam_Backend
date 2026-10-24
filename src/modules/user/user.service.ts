@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -6,6 +7,7 @@ import { CreateUserDto, FilterUserDto, UpdateUserDto } from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import {
+  ADMIN_LOGOUT,
   DEVICE_RESET,
   MOBILE_ONLY_ENABLED,
   OUT_OF_SCHEDULE,
@@ -35,6 +37,7 @@ export class UserService {
     access_start: true,
     access_end: true,
     access_days: true,
+    show_location_pin: true,
     custom_role_id: true,
     custom_role: {
       select: { id: true, name: true, system_slug: true },
@@ -42,11 +45,17 @@ export class UserService {
     deleted_at: true,
   };
 
+  // Duración del token web: una sesión web más antigua ya no sirve aunque no se haya revocado
+  private readonly webSessionTtlMs: number;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly sessionEvents: SessionEventsService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.webSessionTtlMs = parseDurationMs(config.get<string>('JWT_EXPIRES_IN')) ?? 8 * 60 * 60 * 1000;
+  }
 
   async create(dto: CreateUserDto, caller?: Caller): Promise<User> {
     const customRole = await this.prisma.customRole.findFirst({
@@ -103,15 +112,17 @@ export class UserService {
         { email:    { contains: search, mode: 'insensitive' } },
         { dni:      { contains: search, mode: 'insensitive' } },
       ];
-    return await paginationHelper(
+    const result = await paginationHelper<any>(
       this.prisma.user,
       {
-        select: this.select,
+        select: { ...this.select, _count: { select: { sessions: { where: this.activeSessionWhere() } } } },
         where,
         orderBy: { lastname: 'asc' },
       },
       pagination,
     );
+    result.data = result.data.map(({ _count, ...user }) => ({ ...user, active_sessions: _count.sessions }));
+    return result;
   }
 
   async findOne(id: string): Promise<User> {
@@ -172,7 +183,8 @@ export class UserService {
     } else if (changes['max_sessions'] && res.max_sessions! < target.max_sessions) {
       await this.sessionEvents.enforceSessionLimit(id, res.max_sessions!, SESSION_LIMIT_REDUCED);
     }
-    if (changes['custom_role_id']) {
+    // El pin de ubicación viaja con los permisos (custom-role/mine): el front lo aplica sin recargar
+    if (changes['custom_role_id'] || changes['show_location_pin']) {
       this.sessionEvents.notifyPermsChanged([id]);
     }
     // Nuevo horario que ya no incluye la hora actual: se cierran sus sesiones abiertas
@@ -235,6 +247,50 @@ export class UserService {
     return await this.getUserById(id);
   }
 
+  // Sesiones abiertas del usuario (no revocadas y con el token aún vigente)
+  async findSessions(id: string, current_session_id?: string) {
+    await this.getUserById(id, true);
+    const sessions = await this.prisma.userSession.findMany({
+      where: { user_id: id, ...this.activeSessionWhere() },
+      orderBy: { created_at: 'desc' },
+      select: { id: true, user_agent: true, ip: true, created_at: true, is_mobile: true },
+    });
+    return sessions.map((s) => ({ ...s, current: s.id === current_session_id }));
+  }
+
+  // Cierra una sesión (session_id) o todas las del usuario; el dispositivo se entera al instante (SSE)
+  async closeSessions(id: string, session_id: string | null, caller?: Caller) {
+    const target = await this.getUserById(id, true);
+    if (target.custom_role?.system_slug === 'SUPERADMIN' && caller?.system_slug !== 'SUPERADMIN') {
+      throw new ForbiddenException('Solo un Superadmin puede cerrar sesiones de cuentas Superadmin');
+    }
+    const sessions = await this.prisma.userSession.findMany({
+      where: { user_id: id, revoked_at: null, ...(session_id && { id: session_id }) },
+      select: { id: true },
+    });
+    if (session_id && !sessions.length) throw new BadRequestException('La sesión no existe o ya fue cerrada');
+    await this.sessionEvents.revokeSessions(sessions.map((s) => s.id), ADMIN_LOGOUT);
+    await this.audit.log({
+      action: 'SESSION_CLOSE',
+      entity: 'User',
+      entity_id: id,
+      changes: { target_username: target.username, ...(session_id ? { session_id } : { all: true }), closed: sessions.length },
+      performed_by: caller?.username,
+    });
+    return { closed: sessions.length };
+  }
+
+  private activeSessionWhere(): Prisma.UserSessionWhereInput {
+    const now = timezoneHelper();
+    return {
+      revoked_at: null,
+      OR: [
+        { is_mobile: true, refresh_expires_at: { gt: now } },
+        { is_mobile: false, created_at: { gt: new Date(now.getTime() - this.webSessionTtlMs) } },
+      ],
+    };
+  }
+
   // Valida el horario combinando lo enviado con lo que ya tiene el usuario
   private normalizeSchedule(dto: Partial<AccessSchedule>, current?: AccessSchedule): AccessSchedule {
     const pick = <K extends keyof AccessSchedule>(k: K) => (dto[k] !== undefined ? dto[k] : current?.[k]) ?? null;
@@ -274,4 +330,12 @@ export class UserService {
     if (user.deleted_at && !toogle) throw new BadRequestException('Usuario eliminado');
     return user;
   }
+}
+
+// "8h", "30m", "1d", "3600" (segundos) → milisegundos, como JWT_EXPIRES_IN
+function parseDurationMs(value?: string): number | null {
+  const match = /^\s*(\d+)\s*(s|m|h|d)?\s*$/i.exec(value ?? '');
+  if (!match) return null;
+  const unit = { s: 1, m: 60, h: 3600, d: 86400 }[(match[2] ?? 's').toLowerCase()]!;
+  return Number(match[1]) * unit * 1000;
 }
