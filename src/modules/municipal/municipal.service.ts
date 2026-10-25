@@ -8,6 +8,7 @@ import {
 } from './dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { SessionEventsService } from '../session-events/session-events.service';
 import { paginationHelper, timezoneHelper } from '../../common/helpers';
 
 // Campos siempre incluidos: posición, identificación y metadata del mapa
@@ -24,6 +25,7 @@ export class MunicipalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly sessionEvents: SessionEventsService,
   ) {}
 
   async create(dto: CreateMunicipalDto): Promise<Municipal> {
@@ -113,6 +115,7 @@ export class MunicipalService {
         changes: { name: municipal.name, map_hidden },
         performed_by,
       });
+      this.sessionEvents.notifyMapVisibility(id, map_hidden);
     }
     return await this.getMunicipalById(id);
   }

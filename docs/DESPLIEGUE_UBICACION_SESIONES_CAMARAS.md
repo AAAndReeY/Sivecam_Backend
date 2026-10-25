@@ -20,6 +20,7 @@
    - `GET /municipal` sigue devolviendo **todas** las cámaras (con `map_hidden`) para que los totales del mapa no bajen. La web oculta el pin.
    - Filtro nuevo `?map_hidden=true|false`.
    - Las ocultas ya no salen en `/camaras/cercanas`.
+   - Al ocultar o mostrar una cámara, el backend avisa por SSE (`map-visibility`, solo con `{ id, map_hidden }`) a todos los conectados. El pin desaparece o vuelve sin recargar la página.
 
 No hay dependencias nuevas ni variables nuevas en el `.env`.
 
@@ -150,6 +151,7 @@ Pruebas en producción (https, la ubicación funciona en el navegador del celula
   - El admin la ve en gris en el mapa.
   - Un usuario sin permiso de edición no la ve ni la encuentra en el buscador.
   - El **total de cámaras no baja**.
+  - Con otro usuario con el mapa abierto, el pin desaparece al instante, sin recargar.
 
 ---
 
