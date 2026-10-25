@@ -129,6 +129,14 @@ export class SessionEventsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  // Una cámara municipal se ocultó/mostró en el mapa: todos los conectados quitan o
+  // vuelven a dibujar su pin sin recargar (solo viaja el id, sin motivo)
+  notifyMapVisibility(id: string, map_hidden: boolean) {
+    for (const { subject } of this.channels.values()) {
+      subject.next({ type: 'map-visibility', data: { id, map_hidden } });
+    }
+  }
+
   async notifyRoleChanged(custom_role_id: string) {
     const users = await this.prisma.user.findMany({
       where: { custom_role_id },
