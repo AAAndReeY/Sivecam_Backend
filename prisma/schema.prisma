@@ -373,6 +373,110 @@ model GpsZone {
   deleted_at  DateTime?
 }
 
+// ─── Patrullaje y despacho (prueba piloto, 2026-11) ─────────────────────────
+// La "móvil" se identifica por la radio TETRA fija (ISSI de Dolphin).
+// Aún no hay catálogo de móviles: código y tipo se copian de Dolphin al crear.
+
+enum PatrolPlanSource {
+  AUTO    // ruta inteligente generada desde el motor predictivo
+  MANUAL  // ruta creada por orden de subgerencia / alcaldía
+}
+
+enum PatrolPlanStatus {
+  ACTIVO
+  REEMPLAZADO  // una ruta manual o una regeneración la sustituyó
+  CERRADO
+  ANULADO
+}
+
+model PatrolPlan {
+  id             String           @id @default(uuid())
+  date           DateTime         @db.Date
+  shift          Shift
+  source         PatrolPlanSource
+  status         PatrolPlanStatus @default(ACTIVO)
+  unit_issi      String
+  unit_code      String?
+  unit_type      String?
+  // Jurisdicción donde estaba la móvil al generar la ruta (polígono GeoJSON)
+  jurisdiction_id Int?
+  jurisdiction   String?
+  title          String?
+  // Ruta manual: quién la ordenó (cargo y nombre) y documento de sustento
+  ordered_by     String?
+  order_ref      String?
+  notes          String?
+  // Ruta trazada por calles ([lat, lng][]) y resumen
+  route          Json?
+  distance_m     Int?
+  duration_s     Int?
+  model_version  String?
+  created_by     String?
+  stops          PatrolStop[]
+  created_at     DateTime         @default(now())
+  updated_at     DateTime         @updatedAt
+
+  @@index([date, shift])
+  @@index([unit_issi])
+}
+
+model PatrolStop {
+  id          String     @id @default(uuid())
+  plan_id     String
+  plan        PatrolPlan @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  order       Int
+  lat         Float
+  lng         Float
+  cell_id     String?
+  level       String?
+  reason      String?
+  dwell_min   Int        @default(10)
+  // Cumplimiento medido con el histórico GPS de la radio
+  visited_at  DateTime?
+  dwell_s     Int?
+  min_dist_m  Int?
+  checked_at  DateTime?
+
+  @@index([plan_id])
+}
+
+enum DispatchStatus {
+  ASIGNADO
+  EN_LUGAR
+  CERRADO
+  CANCELADO
+}
+
+model Dispatch {
+  id             String         @id @default(uuid())
+  // Incidencia del Sistema de Incidencias CECOM (o punto marcado en el mapa)
+  incident_id    String?
+  incident_code  String?
+  incident_type  String?
+  lat            Float
+  lng            Float
+  reference      String?
+  // Recurso enviado: MOVIL (radio fija del vehículo), RADIO (portátil) o BODYCAM.
+  // unit_issi guarda el ISSI de la radio o el código de la bodycam.
+  resource_type  String         @default("MOVIL")
+  unit_issi      String
+  unit_code      String?
+  rank           Int?
+  eta_s          Int?
+  distance_m     Int?
+  status         DispatchStatus @default(ASIGNADO)
+  assigned_by    String?
+  assigned_at    DateTime       @default(now())
+  arrived_at     DateTime?
+  closed_at      DateTime?
+  notes          String?
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @updatedAt
+
+  @@index([status])
+  @@index([unit_issi])
+}
+
 // Asignación LOCAL de una radio TETRA a una móvil (solo SIVECAM, no se escribe en Dolphin).
 // Sirve para ver la radio en el mapa con el símbolo y el código de la móvil.
 model RadioAssignment {

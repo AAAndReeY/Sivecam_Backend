@@ -26,6 +26,7 @@ import { CampaignPointModule } from './modules/campaign-point/campaign-point.mod
 import { GpsRadioModule } from './modules/gps-radio/gps-radio.module';
 import { GpsZonaModule } from './modules/gps-zona/gps-zona.module';
 import { BodycamModule } from './modules/bodycam/bodycam.module';
+import { PatrullajeModule } from './modules/patrullaje/patrullaje.module';
 import { SessionEventsModule } from './modules/session-events';
 
 @Module({
@@ -58,6 +59,7 @@ import { SessionEventsModule } from './modules/session-events';
     GpsRadioModule,
     GpsZonaModule,
     BodycamModule,
+    PatrullajeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

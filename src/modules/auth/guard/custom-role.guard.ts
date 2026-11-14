@@ -127,6 +127,9 @@ export class CustomRoleGuard implements CanActivate {
             // reportes puede LEER incidencias PNP (crear/editar/borrar siguen
             // exigiendo el modulo 'incidencias-pnp' propio).
             'incidencias-pnp':        ['reportes-incidencias'],
+            // Despacho y rutas manuales necesitan LEER móviles, zonas de riesgo y rutas
+            // (generar o anular rutas inteligentes sigue exigiendo el módulo 'patrullaje').
+            'patrullaje':             ['despacho', 'rutas-manuales'],
           };
           const fallbackParents = readFallbackMap[moduleKey];
           if (fallbackParents) {
