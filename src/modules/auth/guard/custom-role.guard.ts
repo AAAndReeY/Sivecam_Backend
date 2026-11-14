@@ -56,6 +56,14 @@ export class CustomRoleGuard implements CanActivate {
             ]);
             if (rutasLayer || gestion) return true;
           }
+          // Fallback: el módulo de gestión "Radios GPS" necesita LEER las radios y los cercos
+          // aunque el rol no tenga esas capas en el mapa
+          if ((layerKey === 'radios' || layerKey === 'cercosGps') && operation === 'read') {
+            const gestion = await this.prisma.roleModulePermission.findFirst({
+              where: { custom_role_id: user.custom_role_id, module_key: 'radios-gps', can_access: true },
+            });
+            if (gestion) return true;
+          }
           // Fallback: la capa agregada 'robos' se cumple si el usuario tiene acceso al dashboard
           // de serenos O tiene cualquier capa individual de incidencia asignada
           if (layerKey === 'robos' && operation === 'read') {

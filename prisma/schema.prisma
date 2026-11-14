@@ -372,3 +372,16 @@ model GpsZone {
   updated_at  DateTime  @updatedAt
   deleted_at  DateTime?
 }
+
+// Asignación LOCAL de una radio TETRA a una móvil (solo SIVECAM, no se escribe en Dolphin).
+// Sirve para ver la radio en el mapa con el símbolo y el código de la móvil.
+model RadioAssignment {
+  issi        String   @id
+  unit_code   String          // código de la móvil en SIVECAM, p. ej. "ORION 91"
+  unit_kind   String          // CAMIONETA | MOTO | A_PIE
+  plate       String?
+  notes       String?
+  updated_by  String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}

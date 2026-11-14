@@ -1,4 +1,17 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
+
+// Clase de la radio para SIVECAM: con asignación local manda la asignación; si no, el tipo de Dolphin.
+// Dolphin: 1 = CAMION, 2 = AUTOMOVIL, 3 = MOTO, 7 = PERSONA, 0 = sin tipo.
+export const CLASES_RADIO = ['CAMIONETA', 'MOTO', 'A_PIE'] as const;
+function claseDolphin(idUnidad: any): 'CAMIONETA' | 'MOTO' | 'A_PIE' | 'OTRO' {
+  const id = Number(idUnidad);
+  if (id === 3) return 'MOTO';
+  if (id === 1 || id === 2) return 'CAMIONETA';
+  if (id === 7 || id === 0) return 'A_PIE';
+  return 'OTRO';
+}
 import * as https from 'https';
 
 const DOLPHIN_BASE_URL = process.env.DOLPHIN_BASE_URL || 'https://apigps.dolphin.pe';
@@ -26,6 +39,85 @@ function httpsRequest(url: string, options: https.RequestOptions, body?: string 
 
 @Injectable()
 export class GpsRadioService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
+
+  // ─── Asignación local radio -> móvil (solo SIVECAM) ────────────────────────
+  private asigCache: { at: number; mapa: Map<string, any> } | null = null;
+
+  private async asignaciones(): Promise<Map<string, any>> {
+    if (this.asigCache && Date.now() - this.asigCache.at < 10_000) return this.asigCache.mapa;
+    const filas = await this.prisma.radioAssignment.findMany();
+    const mapa = new Map(filas.map((f) => [f.issi, f]));
+    this.asigCache = { at: Date.now(), mapa };
+    return mapa;
+  }
+
+  /**
+   * Agrega a cada radio su clase (CAMIONETA / MOTO / A_PIE / OTRO) y, si tiene asignación local,
+   * muestra el código de la móvil en `unicocodigo` (el de Dolphin queda en `unicocodigo_dolphin`).
+   * Así todas las pantallas que ya usan `unicocodigo` muestran el código asignado sin cambios.
+   */
+  private async enriquecer(units: any[]): Promise<any[]> {
+    let asig: Map<string, any>;
+    try {
+      asig = await this.asignaciones();
+    } catch {
+      asig = new Map();
+    }
+    return units.map((u) => {
+      const a = asig.get(String(u.issi));
+      if (!a) {
+        const clase = claseDolphin(u.idUnidad);
+        return { ...u, clase, es_movil: clase === 'CAMIONETA' || clase === 'MOTO', asignacion: null };
+      }
+      return {
+        ...u,
+        unicocodigo: a.unit_code,
+        unicocodigo_dolphin: u.unicocodigo,
+        clase: a.unit_kind,
+        es_movil: a.unit_kind !== 'A_PIE',
+        asignacion: { codigo: a.unit_code, tipo: a.unit_kind, placa: a.plate, notas: a.notes, actualizado: a.updated_at, por: a.updated_by },
+      };
+    });
+  }
+
+  listarAsignaciones() {
+    return this.prisma.radioAssignment.findMany({ orderBy: { unit_code: 'asc' } });
+  }
+
+  async asignarRadio(
+    issi: string,
+    dto: { codigo?: string; tipo?: string; placa?: string; notas?: string },
+    usuario?: string,
+  ) {
+    const codigo = String(dto?.codigo ?? '').trim();
+    const tipo = String(dto?.tipo ?? '').toUpperCase();
+    if (!/^\d{3,10}$/.test(String(issi))) throw new BadRequestException('ISSI inválido');
+    if (!codigo || codigo.length > 60) throw new BadRequestException('El código de la móvil es obligatorio (máx. 60 caracteres)');
+    if (!(CLASES_RADIO as readonly string[]).includes(tipo)) throw new BadRequestException('Tipo debe ser CAMIONETA, MOTO o A_PIE');
+    const data = {
+      unit_code: codigo,
+      unit_kind: tipo,
+      plate: dto.placa?.trim() || null,
+      notes: dto.notas?.trim()?.slice(0, 500) || null,
+      updated_by: usuario ?? null,
+    };
+    const r = await this.prisma.radioAssignment.upsert({ where: { issi: String(issi) }, create: { issi: String(issi), ...data }, update: data });
+    this.asigCache = null;
+    await this.audit.log({ action: 'ASIGNAR_RADIO_MOVIL', entity: 'RadioAssignment', entity_id: String(issi), changes: data, performed_by: usuario });
+    return r;
+  }
+
+  async quitarAsignacion(issi: string, usuario?: string) {
+    const r = await this.prisma.radioAssignment.deleteMany({ where: { issi: String(issi) } });
+    this.asigCache = null;
+    if (r.count) await this.audit.log({ action: 'QUITAR_ASIGNACION_RADIO', entity: 'RadioAssignment', entity_id: String(issi), performed_by: usuario });
+    return { eliminadas: r.count };
+  }
+
   private cachedToken: string | null = null;
   private tokenExpiresAt = 0;
 
@@ -163,7 +255,7 @@ export class GpsRadioService {
     console.log('[buscar_radios_por_punto] radios encontrados por Dolphin:', raw.length, raw.map(r => r._radio));
 
     // Enriquecer con metadata de todos los radios (incluidos offline sin GPS)
-    await this.findAll(); // asegura que cachedUnitsAll esté poblado
+    await this.findAllRaw(); // asegura que cachedUnitsAll esté poblado
     const unitMap = new Map((this.cachedUnitsAll ?? []).map(u => [Number(u.issi), u]));
 
     return raw.map((r) => {
@@ -304,8 +396,17 @@ export class GpsRadioService {
       throw new InternalServerErrorException('Error al buscar radio en Dolphin');
     }
 
-    const raw = JSON.parse(res.data);
+    let raw: any;
+    try {
+      raw = JSON.parse(res.data);
+    } catch {
+      throw new InternalServerErrorException('Dolphin devolvió un formato inválido al buscar la radio');
+    }
     const u = Array.isArray(raw) ? raw[0] : raw;
+    // ISSI que no existe en Dolphin: avisar en vez de caer con 500
+    if (!u || u._issi == null) {
+      throw new NotFoundException(`El ISSI ${issi} no está registrado en Dolphin para la municipalidad`);
+    }
     return {
       issi:       u._issi,
       empresa:    u._empresa,
@@ -364,11 +465,28 @@ export class GpsRadioService {
       throw new InternalServerErrorException('Error al actualizar radio en Dolphin');
     }
 
-    this.cachedUnits = null; // invalidar cache
-    return JSON.parse(res.data);
+    // invalidar caché para que la lista muestre el cambio de inmediato
+    this.cachedUnits = null;
+    this.cachedUnitsAll = null;
+    this.unitsExpiresAt = 0;
+    try {
+      return JSON.parse(res.data);
+    } catch {
+      return { ok: true };
+    }
+  }
+
+  /** Todas las radios, también las que no reportan GPS (para ver estado y última posición conocida). */
+  async findAllIncludingOffline(): Promise<any[]> {
+    await this.findAllRaw();
+    return this.enriquecer(this.cachedUnitsAll ?? []);
   }
 
   async findAll() {
+    return this.enriquecer(await this.findAllRaw());
+  }
+
+  private async findAllRaw() {
     if (this.cachedUnits && Date.now() < this.unitsExpiresAt) {
       return this.cachedUnits;
     }

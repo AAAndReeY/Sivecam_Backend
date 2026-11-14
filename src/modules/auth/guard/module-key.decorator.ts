@@ -9,3 +9,5 @@ export type ModuleOperation = 'read' | 'create' | 'edit' | 'delete';
 export const ModuleKey = (key: string)         => SetMetadata(MODULE_KEY, key);
 export const ModuleOp  = (op: ModuleOperation) => SetMetadata(MODULE_OP,  op);
 export const LayerKey  = (key: string)         => SetMetadata(LAYER_KEY,  key);
+/** Anula el @LayerKey de la clase en un método: ese método se valida por @ModuleKey (escrituras). */
+export const NoLayer   = ()                    => SetMetadata(LAYER_KEY,  null);
