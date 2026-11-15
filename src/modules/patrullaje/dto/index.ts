@@ -5,6 +5,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsDateString,
   IsEnum,
   IsIn,
   IsInt,
@@ -21,6 +22,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { parseShift } from '../turnos.util';
+import { CATEGORIAS, Categoria, PRIORIDADES, Prioridad } from '../tipos-incidencia';
 
 const toShift = ({ value }: { value: any }) => parseShift(value) ?? value;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -177,11 +179,62 @@ export class AsignarDto {
   @IsOptional()
   @IsBoolean()
   forzar?: boolean;
+
+  /** Varias unidades a la misma emergencia: todas llevan el mismo grupo (refuerzos incluidos). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  group_id?: string;
+
+  /** Hora de registro de la incidencia (para medir recepción -> despacho). */
+  @IsOptional()
+  @IsDateString()
+  incident_registered_at?: string;
+
+  @IsOptional()
+  @IsIn(PRIORIDADES)
+  prioridad?: Prioridad;
 }
 
+/** Resultados posibles al cerrar o cancelar un despacho. */
+export const RESULTADOS_DESPACHO = [
+  'ATENDIDO',
+  'SIN_NOVEDAD',
+  'FALSA_ALARMA',
+  'DERIVADO_PNP',
+  'DERIVADO_BOMBEROS',
+  'DERIVADO_SAMU',
+  'NO_UBICADO',
+  'REASIGNADO',
+  'OTRO',
+] as const;
+
 export class CerrarDto {
+  @IsOptional()
+  @IsIn(RESULTADOS_DESPACHO as unknown as string[])
+  resultado?: (typeof RESULTADOS_DESPACHO)[number];
+
   @IsOptional()
   @IsString()
   @MaxLength(1000)
   notas?: string;
+}
+
+export class TipoIncidenciaDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  tipo: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  corto?: string;
+
+  @IsIn(PRIORIDADES)
+  prioridad: Prioridad;
+
+  @IsOptional()
+  @IsIn(CATEGORIAS)
+  categoria?: Categoria;
 }

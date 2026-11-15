@@ -6,13 +6,15 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { FACTOR_VIAL, LatLng, enlacesNavegacion, haversineM, matrizHaciaDestino, rutaPorCalles } from './geo.util';
 import { CamarasService } from './camaras.service';
 import { MovilesService, Recurso, TipoRecurso } from './moviles.service';
 import { PrediccionClient } from './prediccion.client';
-import { AsignarDto } from './dto';
+import { AsignarDto, CerrarDto, TipoIncidenciaDto } from './dto';
+import { ORDEN_PRIORIDAD, clasePorDefecto, clasificar, normalizarTipo } from './tipos-incidencia';
 
 // Llegada automática: la radio de la móvil asignada reporta a esta distancia o menos del punto.
 export const RADIO_LLEGADA_M = 75;
@@ -24,8 +26,22 @@ const VELOCIDAD_A_PIE_MS = 1.3; // ~4.7 km/h
 // Ruta por calles de un despacho abierto: se recalcula cuando pasa este tiempo o la móvil se movió más de esta distancia.
 const RUTA_TTL_MS = 90_000;
 const RUTA_MOVIMIENTO_M = 60;
+// GPS "viejo" al sugerir: la posición tiene más de estos minutos (la móvil sigue en línea, pero puede no estar ahí).
+const MINUTOS_GPS_VIEJO = 5;
+// Despacho atrasado: sin llegada después de 1.5 veces el tiempo estimado, y nunca antes de este mínimo.
+const ATRASO_MIN_S = 10 * 60;
+const TIPOS_TTL_MS = 60_000;
 
 type RutaCalles = Awaited<ReturnType<typeof rutaPorCalles>>;
+type ConfigTipos = Map<string, { corto: string; prioridad: string; categoria: string | null }>;
+
+/** Estado de una incidencia según sus despachos: PENDIENTE (ninguno), DESPACHADA, EN_ATENCION, CERRADA. */
+const estadoIncidencia = (ds: { status: string }[]) => {
+  if (!ds.length) return 'PENDIENTE';
+  if (ds.some((d) => d.status === 'EN_LUGAR')) return 'EN_ATENCION';
+  if (ds.some((d) => d.status === 'ASIGNADO')) return 'DESPACHADA';
+  return ds.some((d) => d.status === 'CERRADO') ? 'CERRADA' : 'PENDIENTE'; // solo cancelados: vuelve a pendiente
+};
 
 @Injectable()
 export class DespachoService implements OnModuleInit, OnModuleDestroy {
@@ -34,6 +50,7 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
   private revisando = false;
   // id del despacho -> última ruta calculada y desde dónde
   private rutas = new Map<string, { at: number; desde: LatLng; ruta: RutaCalles }>();
+  private tiposCache: { at: number; map: ConfigTipos } | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -51,14 +68,99 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  incidenciasRecientes(horas = 12) {
-    return this.prediccion.incidenciasRecientes(horas);
+  // ─── Tipos de incidencia: prioridad y nombre corto ─────────────────────────
+  private async configTipos(): Promise<ConfigTipos> {
+    if (this.tiposCache && Date.now() - this.tiposCache.at < TIPOS_TTL_MS) return this.tiposCache.map;
+    const rows = await this.prisma.incidentTypeConfig.findMany();
+    const map: ConfigTipos = new Map(rows.map((r) => [normalizarTipo(r.tipo), r]));
+    this.tiposCache = { at: Date.now(), map };
+    return map;
+  }
+
+  /** Tipos conocidos (configurados + vistos en los últimos 3 días) con su prioridad y nombre corto. */
+  async tipos() {
+    const [config, recientes] = await Promise.all([
+      this.prisma.incidentTypeConfig.findMany({ orderBy: { tipo: 'asc' } }),
+      this.prediccion.incidenciasRecientes(72, 2000).catch(() => ({ rows: [] as any[] })),
+    ]);
+    const porTipo = new Map<string, { tipo: string; grupo: string | null; vistos: number }>();
+    for (const r of recientes.rows ?? []) {
+      const k = normalizarTipo(r.tipo);
+      if (!k) continue;
+      const e = porTipo.get(k) ?? { tipo: String(r.tipo).replace(/\s+/g, ' ').trim(), grupo: r.grupo ?? null, vistos: 0 };
+      e.vistos++;
+      porTipo.set(k, e);
+    }
+    const map: ConfigTipos = new Map(config.map((c) => [normalizarTipo(c.tipo), c]));
+    for (const c of config) {
+      const k = normalizarTipo(c.tipo);
+      if (!porTipo.has(k)) porTipo.set(k, { tipo: c.tipo, grupo: null, vistos: 0 });
+    }
+    return [...porTipo.values()]
+      .map((e) => {
+        const def = clasePorDefecto(e.tipo, e.grupo);
+        const fin = clasificar(e.tipo, e.grupo, map);
+        return { ...e, ...fin, por_defecto: def, configurado: map.has(normalizarTipo(e.tipo)) };
+      })
+      .sort((a, b) => ORDEN_PRIORIDAD[a.prioridad] - ORDEN_PRIORIDAD[b.prioridad] || b.vistos - a.vistos || a.tipo.localeCompare(b.tipo));
+  }
+
+  async guardarTipo(dto: TipoIncidenciaDto, usuario?: string) {
+    const tipo = String(dto.tipo).replace(/\s+/g, ' ').trim();
+    const def = clasePorDefecto(tipo);
+    const data = { corto: (dto.corto ?? '').trim() || def.corto, prioridad: dto.prioridad, categoria: dto.categoria ?? def.categoria, updated_by: usuario };
+    const r = await this.prisma.incidentTypeConfig.upsert({ where: { tipo }, create: { tipo, ...data }, update: data });
+    this.tiposCache = null;
+    await this.audit.log({ action: 'CONFIGURAR_TIPO_INCIDENCIA', entity: 'IncidentTypeConfig', entity_id: tipo, changes: data, performed_by: usuario });
+    return r;
+  }
+
+  /**
+   * Incidencias recientes del Sistema de Incidencias con prioridad, nombre corto y estado de atención
+   * (según los despachos de SIVECAM). Pendientes primero, por prioridad y luego las más nuevas.
+   */
+  async incidenciasRecientes(horas = 12) {
+    const [res, config] = await Promise.all([this.prediccion.incidenciasRecientes(horas), this.configTipos()]);
+    const rows: any[] = res.rows ?? [];
+    const ids = rows.map((r) => String(r.id));
+    const despachos = ids.length
+      ? await this.prisma.dispatch.findMany({
+          where: { incident_id: { in: ids } },
+          select: { id: true, incident_id: true, status: true, unit_code: true, group_id: true, assigned_at: true },
+          orderBy: { assigned_at: 'asc' },
+        })
+      : [];
+    const porInc = new Map<string, typeof despachos>();
+    for (const d of despachos) {
+      const l = porInc.get(d.incident_id!) ?? [];
+      l.push(d);
+      porInc.set(d.incident_id!, l);
+    }
+    const ORDEN_ESTADO: Record<string, number> = { PENDIENTE: 0, DESPACHADA: 1, EN_ATENCION: 1, CERRADA: 2 };
+    const out = rows.map((r) => {
+      const ds = porInc.get(String(r.id)) ?? [];
+      const abiertos = ds.filter((d) => d.status === 'ASIGNADO' || d.status === 'EN_LUGAR');
+      return {
+        ...r,
+        ...clasificar(r.tipo, r.grupo, config),
+        estado: estadoIncidencia(ds),
+        unidades: abiertos.map((d) => d.unit_code).filter(Boolean),
+        group_id: abiertos[0]?.group_id ?? ds[ds.length - 1]?.group_id ?? null,
+      };
+    });
+    out.sort(
+      (a, b) =>
+        ORDEN_ESTADO[a.estado] - ORDEN_ESTADO[b.estado] ||
+        ORDEN_PRIORIDAD[a.prioridad] - ORDEN_PRIORIDAD[b.prioridad] ||
+        String(b.registrado).localeCompare(String(a.registrado)),
+    );
+    return { horas, rows: out };
   }
 
   /** Ranking de móviles para un punto: prefiltro en línea recta y luego tiempo por calles (una sola consulta). */
   async sugerir(lat: number, lng: number, user?: any) {
     const destino = { lat, lng };
-    const enLinea = await this.moviles.enLinea();
+    const [enLinea, jurPunto] = await Promise.all([this.moviles.enLinea(), this.prediccion.jurisdiccionDe(destino).catch(() => null)]);
     const pre = enLinea
       .map((m) => ({ m, recta: haversineM(m, destino) }))
       .sort((a, b) => a.recta - b.recta)
@@ -73,14 +175,18 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
         lat: p.m.lat,
         lng: p.m.lng,
         minutos_sin_reporte: p.m.minutos_sin_reporte,
+        gps_viejo: (p.m.minutos_sin_reporte ?? 0) > MINUTOS_GPS_VIEJO,
         ocupada: !!p.m.despacho_abierto,
+        despacho_abierto: p.m.despacho_abierto,
+        otra_jurisdiccion: !!(jurPunto && p.m.jurisdiccion && p.m.jurisdiccion.id !== jurPunto.id),
         recta_m: Math.round(p.recta),
         distance_m: matriz[i].distance_m,
         duration_s: matriz[i].duration_s,
         fuente: matriz[i].fuente,
       }))
-      .sort((a, b) => Number(a.ocupada) - Number(b.ocupada) || a.duration_s - b.duration_s)
-      .map((r, i) => ({ ...r, rank: i + 1 }));
+      // Libres primero; entre libres, las de GPS fresco antes que las de posición vieja; luego por tiempo por calles
+      .sort((a, b) => Number(a.ocupada) - Number(b.ocupada) || Number(a.gps_viejo) - Number(b.gps_viejo) || a.duration_s - b.duration_s)
+      .map((r, i) => ({ ...r, rank: i + 1, razon: this.razonSugerencia(r, i) }));
     const aPie = (await this.moviles.aPieCerca(destino, RADIO_A_PIE_M)).slice(0, 8).map((g, i) => {
       const r = g.principal;
       const calle = Math.round(r.recta_m * FACTOR_VIAL);
@@ -107,6 +213,7 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
     const rutaMejor = mejor ? { issi: mejor.issi, ...(await rutaPorCalles([{ lat: mejor.lat, lng: mejor.lng }, destino])) } : null;
     return {
       destino,
+      jurisdiccion: jurPunto ? { id: jurPunto.id, nombre: jurPunto.nombre } : null,
       enlaces: enlacesNavegacion(destino),
       moviles_en_linea: enLinea.length,
       ranking,
@@ -117,6 +224,21 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /** Una línea que explica el lugar de cada móvil en el ranking. */
+  private razonSugerencia(
+    r: { ocupada: boolean; gps_viejo: boolean; otra_jurisdiccion: boolean; minutos_sin_reporte: number | null; duration_s: number; fuente: string; jurisdiccion: string | null },
+    i: number,
+  ) {
+    if (r.ocupada) return 'Ya atiende otro despacho';
+    const partes: string[] = [];
+    if (i === 0) partes.push('La más rápida por calles');
+    else partes.push(`${Math.round(r.duration_s / 60)} min por calles`);
+    if (r.gps_viejo) partes.push(`posición de hace ${r.minutos_sin_reporte} min`);
+    if (r.otra_jurisdiccion) partes.push(`viene de ${r.jurisdiccion}`);
+    if (r.fuente !== 'osrm') partes.push('tiempo estimado');
+    return partes.join(', ');
+  }
+
   async asignar(dto: AsignarDto, usuario?: string) {
     const tipo: TipoRecurso = dto.tipo ?? 'MOVIL';
     const movil = await this.moviles.buscarRecurso(tipo, dto.issi);
@@ -124,11 +246,17 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
     if (movil.despacho_abierto && !dto.forzar) {
       throw new ConflictException(`${movil.codigo} ya tiene un despacho abierto`);
     }
+    // Grupo: todas las unidades enviadas a la misma emergencia comparten group_id (refuerzos incluidos)
+    const groupId = dto.group_id?.trim() || (dto.incident_id ? `inc-${dto.incident_id}` : randomUUID());
+    const prioridad = dto.prioridad ?? (dto.incident_type ? clasificar(dto.incident_type, null, await this.configTipos()).prioridad : null);
     const d = await this.prisma.dispatch.create({
       data: {
         incident_id: dto.incident_id,
         incident_code: dto.incident_code,
         incident_type: dto.incident_type,
+        incident_registered_at: dto.incident_registered_at ? new Date(dto.incident_registered_at) : null,
+        priority: prioridad,
+        group_id: groupId,
         reference: dto.referencia,
         lat: dto.lat,
         lng: dto.lng,
@@ -142,11 +270,12 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
         assigned_by: usuario,
       },
     });
+    const refuerzo = await this.prisma.dispatch.count({ where: { group_id: groupId, id: { not: d.id } } });
     await this.audit.log({
-      action: 'DESPACHAR',
+      action: refuerzo ? 'DESPACHAR_REFUERZO' : 'DESPACHAR',
       entity: 'Dispatch',
       entity_id: d.id,
-      changes: { recurso: tipo, codigo: movil.codigo, incidencia: dto.incident_code, rank: dto.rank, eta_s: dto.eta_s },
+      changes: { recurso: tipo, codigo: movil.codigo, incidencia: dto.incident_code, prioridad, grupo: groupId, rank: dto.rank, eta_s: dto.eta_s },
       performed_by: usuario,
     });
     return this.conTiempos(d, movil);
@@ -158,11 +287,15 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
       where: { OR: [{ assigned_at: { gte: desde } }, { status: { in: ['ASIGNADO', 'EN_LUGAR'] } }] },
       orderBy: { assigned_at: 'desc' },
     });
-    const recursos = await this.recursosDe(lista);
+    const [recursos, config] = await Promise.all([this.recursosDe(lista), this.configTipos()]);
     // Rutas por calles solo de los despachos en camino (en paralelo; cada una usa su caché)
     const rutas = await Promise.all(lista.map((d) => this.rutaDespacho(d, recursos.get(`${d.resource_type}:${d.unit_issi}`))));
     for (const id of this.rutas.keys()) if (!lista.some((d) => d.id === id && d.status === 'ASIGNADO')) this.rutas.delete(id);
-    return lista.map((d, i) => this.conTiempos(d, recursos.get(`${d.resource_type}:${d.unit_issi}`), rutas[i]));
+    return lista.map((d, i) => ({
+      ...this.conTiempos(d, recursos.get(`${d.resource_type}:${d.unit_issi}`), rutas[i]),
+      // Nombre corto del tipo (para la tarjeta); la prioridad guardada es la del momento del despacho
+      incident_corto: d.incident_type ? clasificar(d.incident_type, null, config).corto : null,
+    }));
   }
 
   /**
@@ -184,13 +317,26 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
   }
 
   private conTiempos(d: any, movil?: any, ruta: RutaCalles | null = null) {
-    const respuesta_s = d.arrived_at ? Math.round((d.arrived_at.getTime() - d.assigned_at.getTime()) / 1000) : null;
+    const seg = (a?: Date | null, b?: Date | null) => (a && b ? Math.round((b.getTime() - a.getTime()) / 1000) : null);
+    const ahora = new Date();
+    const respuesta_s = seg(d.assigned_at, d.arrived_at);
     const distancia_actual_m =
       movil?.lat != null && movil?.lng != null ? Math.round(haversineM(movil, d)) : null;
+    // Límite para avisar atraso: 1.5 veces el tiempo estimado, nunca menos de 10 min
+    const limite_s = Math.max(ATRASO_MIN_S, Math.round((d.eta_s ?? 0) * 1.5));
+    const transcurrido_s = seg(d.assigned_at, d.closed_at ?? ahora)!;
     return {
       ...d,
       respuesta_s,
-      transcurrido_s: Math.round(((d.closed_at ?? new Date()).getTime() - d.assigned_at.getTime()) / 1000),
+      transcurrido_s,
+      limite_s,
+      atrasado: d.status === 'ASIGNADO' && transcurrido_s > limite_s,
+      // Cronómetros por tramo (segundos): recepción de la incidencia -> despacho -> llegada -> cierre
+      tramos: {
+        recepcion_a_despacho_s: seg(d.incident_registered_at, d.assigned_at),
+        despacho_a_llegada_s: respuesta_s,
+        llegada_a_cierre_s: seg(d.arrived_at, d.closed_at ?? (d.status === 'EN_LUGAR' ? ahora : null)),
+      },
       movil_actual: movil
         ? { lat: movil.lat, lng: movil.lng, minutos_sin_reporte: movil.minutos_sin_reporte, en_linea: movil.en_linea }
         : null,
@@ -256,14 +402,17 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
     return r;
   }
 
-  async cerrar(id: string, cancelado: boolean, notas?: string, usuario?: string) {
+  async cerrar(id: string, cancelado: boolean, dto: CerrarDto = {}, usuario?: string) {
     const d = await this.prisma.dispatch.findUnique({ where: { id } });
     if (!d) throw new NotFoundException('Despacho no encontrado');
+    if (d.status === 'CERRADO' || d.status === 'CANCELADO') throw new ConflictException('Este despacho ya está cerrado');
+    const notas = dto.notas?.trim();
     const r = await this.prisma.dispatch.update({
       where: { id },
       data: {
         status: cancelado ? 'CANCELADO' : 'CERRADO',
         closed_at: new Date(),
+        result: dto.resultado ?? (cancelado ? 'OTRO' : 'ATENDIDO'),
         notes: notas ? [d.notes, notas].filter(Boolean).join(' | ') : d.notes,
       },
     });
@@ -271,7 +420,7 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
       action: cancelado ? 'CANCELAR_DESPACHO' : 'CERRAR_DESPACHO',
       entity: 'Dispatch',
       entity_id: id,
-      changes: notas ? { notas } : undefined,
+      changes: { movil: d.unit_code, resultado: r.result, ...(notas ? { notas } : {}) },
       performed_by: usuario,
     });
     return r;
@@ -286,15 +435,32 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
       .map((d) => (d.arrived_at!.getTime() - d.assigned_at.getTime()) / 1000)
       .sort((a, b) => a - b);
     const q = (p: number) => (tiempos.length ? Math.round(tiempos[Math.min(tiempos.length - 1, Math.floor(p * tiempos.length))]) : null);
+    const contar = (clave: (d: (typeof lista)[number]) => string | null | undefined) => {
+      const out: Record<string, number> = {};
+      for (const d of lista) {
+        const k = clave(d);
+        if (k) out[k] = (out[k] ?? 0) + 1;
+      }
+      return out;
+    };
+    const recepcion = lista
+      .filter((d) => d.incident_registered_at)
+      .map((d) => (d.assigned_at.getTime() - d.incident_registered_at!.getTime()) / 1000)
+      .filter((s) => s >= 0)
+      .sort((a, b) => a - b);
     return {
       horas,
       despachos: lista.length,
+      emergencias: new Set(lista.map((d) => d.group_id ?? d.id)).size,
       con_llegada: tiempos.length,
       abiertos: lista.filter((d) => d.status === 'ASIGNADO' || d.status === 'EN_LUGAR').length,
       cancelados: lista.filter((d) => d.status === 'CANCELADO').length,
       respuesta_mediana_s: q(0.5),
       respuesta_p90_s: q(0.9),
+      recepcion_a_despacho_mediana_s: recepcion.length ? Math.round(recepcion[Math.floor(recepcion.length / 2)]) : null,
       eligieron_primera_sugerencia: lista.filter((d) => d.rank === 1).length,
+      por_resultado: contar((d) => d.result),
+      por_prioridad: contar((d) => d.priority),
       radio_llegada_m: RADIO_LLEGADA_M,
     };
   }

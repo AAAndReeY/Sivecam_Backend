@@ -7,13 +7,14 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { CustomRoleGuard, JwtAuthGuard, ModuleKey, ModuleOp } from '../auth/guard';
 import { DespachoService } from './despacho.service';
-import { AsignarDto, CerrarDto, GenerarRutasDto, RutaManualDto } from './dto';
+import { AsignarDto, CerrarDto, GenerarRutasDto, RutaManualDto, TipoIncidenciaDto } from './dto';
 import { MovilesService } from './moviles.service';
 import { PatrullajeService } from './patrullaje.service';
 import { parseShift } from './turnos.util';
@@ -132,12 +133,24 @@ export class DespachoController {
   @ModuleOp('edit')
   @Patch(':id/cerrar')
   cerrar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CerrarDto, @Req() req: any) {
-    return this.despacho.cerrar(id, false, dto.notas, req.user?.username);
+    return this.despacho.cerrar(id, false, dto, req.user?.username);
   }
 
   @ModuleOp('edit')
   @Patch(':id/cancelar')
   cancelar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CerrarDto, @Req() req: any) {
-    return this.despacho.cerrar(id, true, dto.notas, req.user?.username);
+    return this.despacho.cerrar(id, true, dto, req.user?.username);
+  }
+
+  /** Prioridad y nombre corto por tipo de incidencia (lo que la torre configuró y los valores por defecto). */
+  @Get('tipos')
+  tipos() {
+    return this.despacho.tipos();
+  }
+
+  @ModuleOp('edit')
+  @Put('tipos')
+  guardarTipo(@Body() dto: TipoIncidenciaDto, @Req() req: any) {
+    return this.despacho.guardarTipo(dto, req.user?.username);
   }
 }
