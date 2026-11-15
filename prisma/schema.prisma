@@ -470,11 +470,32 @@ model Dispatch {
   arrived_at     DateTime?
   closed_at      DateTime?
   notes          String?
+  // Varias unidades a una misma emergencia comparten group_id (inc-<id de incidencia> o uuid del punto marcado)
+  group_id       String?
+  // Hora en que se registró la incidencia en el Sistema de Incidencias (tramo recepción -> despacho)
+  incident_registered_at DateTime?
+  // Prioridad del tipo al momento de despachar: ALTA | MEDIA | BAJA
+  priority       String?
+  // Resultado al cerrar o cancelar: ATENDIDO, FALSA_ALARMA, DERIVADO_PNP, DERIVADO_BOMBEROS, DERIVADO_SAMU,
+  // NO_UBICADO, REASIGNADO, SIN_NOVEDAD, OTRO
+  result         String?
   created_at     DateTime       @default(now())
   updated_at     DateTime       @updatedAt
 
   @@index([status])
   @@index([unit_issi])
+  @@index([group_id])
+}
+
+// Prioridad y nombre corto por tipo de incidencia (configurable desde Despacho). Si un tipo no está aquí,
+// se usa la regla por defecto de tipos-incidencia.ts (según el grupo del motor predictivo).
+model IncidentTypeConfig {
+  tipo        String   @id        // descripción del tipo tal como llega del Sistema de Incidencias
+  corto       String              // nombre corto para listas y mapa
+  prioridad   String              // ALTA | MEDIA | BAJA
+  categoria   String?             // PERSONA | PATRIMONIO | AUXILIO | TRANSITO | TRANQUILIDAD | COSTUMBRES | ORDENANZAS | OTROS
+  updated_by  String?
+  updated_at  DateTime @updatedAt
 }
 
 // Asignación LOCAL de una radio TETRA a una móvil (solo SIVECAM, no se escribe en Dolphin).
