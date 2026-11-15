@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { FACTOR_VIAL, enlacesNavegacion, haversineM, matrizHaciaDestino } from './geo.util';
+import { FACTOR_VIAL, LatLng, enlacesNavegacion, haversineM, matrizHaciaDestino, rutaPorCalles } from './geo.util';
 import { CamarasService } from './camaras.service';
 import { MovilesService, Recurso, TipoRecurso } from './moviles.service';
 import { PrediccionClient } from './prediccion.client';
@@ -21,12 +21,19 @@ const CANDIDATAS = 8;
 // Personal a pie: se buscan radios portátiles y bodycams a esta distancia (en línea recta) del punto.
 export const RADIO_A_PIE_M = 800;
 const VELOCIDAD_A_PIE_MS = 1.3; // ~4.7 km/h
+// Ruta por calles de un despacho abierto: se recalcula cuando pasa este tiempo o la móvil se movió más de esta distancia.
+const RUTA_TTL_MS = 90_000;
+const RUTA_MOVIMIENTO_M = 60;
+
+type RutaCalles = Awaited<ReturnType<typeof rutaPorCalles>>;
 
 @Injectable()
 export class DespachoService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DespachoService.name);
   private timer: NodeJS.Timeout | null = null;
   private revisando = false;
+  // id del despacho -> última ruta calculada y desde dónde
+  private rutas = new Map<string, { at: number; desde: LatLng; ruta: RutaCalles }>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -95,11 +102,15 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
           : null,
       };
     });
+    // Recorrido por calles de la mejor sugerencia (una sola consulta extra), para dibujarlo en el mapa
+    const mejor = ranking[0];
+    const rutaMejor = mejor ? { issi: mejor.issi, ...(await rutaPorCalles([{ lat: mejor.lat, lng: mejor.lng }, destino])) } : null;
     return {
       destino,
       enlaces: enlacesNavegacion(destino),
       moviles_en_linea: enLinea.length,
       ranking,
+      ruta_mejor: rutaMejor,
       a_pie: aPie,
       radio_a_pie_m: RADIO_A_PIE_M,
       camaras: await this.camaras.cerca(destino, user),
@@ -148,10 +159,31 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
       orderBy: { assigned_at: 'desc' },
     });
     const recursos = await this.recursosDe(lista);
-    return lista.map((d) => this.conTiempos(d, recursos.get(`${d.resource_type}:${d.unit_issi}`)));
+    // Rutas por calles solo de los despachos en camino (en paralelo; cada una usa su caché)
+    const rutas = await Promise.all(lista.map((d) => this.rutaDespacho(d, recursos.get(`${d.resource_type}:${d.unit_issi}`))));
+    for (const id of this.rutas.keys()) if (!lista.some((d) => d.id === id && d.status === 'ASIGNADO')) this.rutas.delete(id);
+    return lista.map((d, i) => this.conTiempos(d, recursos.get(`${d.resource_type}:${d.unit_issi}`), rutas[i]));
   }
 
-  private conTiempos(d: any, movil?: any) {
+  /**
+   * Recorrido por calles desde la posición actual de la móvil hasta el punto, con tiempo y distancia que se
+   * actualizan mientras avanza. Solo para móviles en camino; se reutiliza hasta RUTA_TTL_MS o RUTA_MOVIMIENTO_M.
+   */
+  private async rutaDespacho(d: any, movil?: Recurso): Promise<RutaCalles | null> {
+    if (d.status !== 'ASIGNADO' || d.resource_type !== 'MOVIL' || movil?.lat == null || movil?.lng == null) return null;
+    const desde = { lat: movil.lat, lng: movil.lng };
+    const c = this.rutas.get(d.id);
+    if (c && Date.now() - c.at < RUTA_TTL_MS && haversineM(c.desde, desde) < RUTA_MOVIMIENTO_M) return c.ruta;
+    try {
+      const ruta = await rutaPorCalles([desde, { lat: d.lat, lng: d.lng }]);
+      this.rutas.set(d.id, { at: Date.now(), desde, ruta });
+      return ruta;
+    } catch {
+      return c?.ruta ?? null;
+    }
+  }
+
+  private conTiempos(d: any, movil?: any, ruta: RutaCalles | null = null) {
     const respuesta_s = d.arrived_at ? Math.round((d.arrived_at.getTime() - d.assigned_at.getTime()) / 1000) : null;
     const distancia_actual_m =
       movil?.lat != null && movil?.lng != null ? Math.round(haversineM(movil, d)) : null;
@@ -163,6 +195,7 @@ export class DespachoService implements OnModuleInit, OnModuleDestroy {
         ? { lat: movil.lat, lng: movil.lng, minutos_sin_reporte: movil.minutos_sin_reporte, en_linea: movil.en_linea }
         : null,
       distancia_actual_m,
+      ruta,
       enlaces: enlacesNavegacion(d),
     };
   }
