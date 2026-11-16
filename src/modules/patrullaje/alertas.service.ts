@@ -8,9 +8,10 @@ import { turnoActual } from './turnos.util';
 
 /**
  * Alertas automáticas del turno. Cada minuto se revisa la flota y se abren o cierran solas:
- *  - DETENIDA: móvil en servicio, sin despacho, quieta más de DETENIDA_MIN fuera de una parada de su ruta.
+ *  - DETENIDA: móvil con ruta del turno, sin despacho, quieta más de DETENIDA_MIN fuera de una parada de su ruta.
  *  - FUERA_JURISDICCION: móvil con ruta del turno que está en otra jurisdicción (dos revisiones seguidas).
- *  - SIN_REPORTE: radio o bodycam que estaba en línea y dejó de reportar.
+ *  - SIN_REPORTE: móvil o radio portátil que venía reportando (RACHA_EN_LINEA revisiones seguidas) y dejó de hacerlo.
+ *    Las bodycams no entran: entran y salen de línea todo el tiempo y solo meterían ruido.
  *  - JURISDICCION_SIN_MOVIL: jurisdicción sin ninguna móvil con GPS en servicio.
  * La torre puede marcarlas como atendidas; todas quedan como historial (PatrolAlert).
  */
@@ -19,6 +20,7 @@ const DETENIDA_MIN = 15;
 const MOVIMIENTO_M = 40; // menos que esto no cuenta como moverse (ruido del GPS)
 const RADIO_PARADA_M = 150;
 const SIN_REPORTE_MAX_MIN = 180; // más viejo que esto ya no es "dejó de reportar", es "apagada"
+const RACHA_EN_LINEA = 3; // revisiones seguidas en línea antes de que una caída cuente como "dejó de reportar"
 
 export type TipoAlerta = 'DETENIDA' | 'FUERA_JURISDICCION' | 'SIN_REPORTE' | 'JURISDICCION_SIN_MOVIL';
 
@@ -41,8 +43,8 @@ export class AlertasService implements OnModuleInit, OnModuleDestroy {
   private revisando = false;
   // Última posición "distinta" de cada móvil (para detectar que está detenida)
   private quietas = new Map<string, { lat: number; lng: number; desde: number }>();
-  // Unidades que estaban en línea en la revisión anterior y las que cayeron (para "dejó de reportar")
-  private enLineaAntes = new Set<string>();
+  // Revisiones seguidas en línea por unidad y las que cayeron (para "dejó de reportar")
+  private racha = new Map<string, number>();
   private cayeron = new Set<string>();
   // Fuera de jurisdicción: cuántas revisiones seguidas
   private fueraJur = new Map<string, number>();
@@ -152,8 +154,15 @@ export class AlertasService implements OnModuleInit, OnModuleDestroy {
       ...moviles.map((m) => ({ key: `MOVIL:${m.issi}`, tipo: 'MOVIL', id: m.issi, codigo: m.codigo, en_linea: m.en_linea, min: m.minutos_sin_reporte, lat: m.lat, lng: m.lng, jur: m.jurisdiccion?.nombre })),
       ...aPie.map((r) => ({ key: `${r.tipo}:${r.id}`, tipo: r.tipo, id: r.id, codigo: r.codigo, en_linea: r.en_linea, min: r.minutos_sin_reporte, lat: r.lat, lng: r.lng })),
     ];
-    const enLineaAhora = new Set(todas.filter((u) => u.en_linea).map((u) => u.key));
-    for (const k of this.enLineaAntes) if (!enLineaAhora.has(k)) this.cayeron.add(k);
+    for (const u of todas) {
+      if (u.tipo === 'BODYCAM') continue;
+      const r = this.racha.get(u.key) ?? 0;
+      if (u.en_linea) this.racha.set(u.key, r + 1);
+      else {
+        if (r >= RACHA_EN_LINEA) this.cayeron.add(u.key);
+        this.racha.set(u.key, 0);
+      }
+    }
     for (const u of todas) {
       if (!this.cayeron.has(u.key)) continue;
       if (u.en_linea || (u.min ?? Infinity) > SIN_REPORTE_MAX_MIN || u.min === null) {
@@ -163,7 +172,6 @@ export class AlertasService implements OnModuleInit, OnModuleDestroy {
       const nombre = u.tipo === 'MOVIL' ? u.codigo : `${u.tipo === 'BODYCAM' ? 'Bodycam' : 'Radio'} ${u.codigo}`;
       out.push({ key: `SIN_REPORTE:${u.key}`, type: 'SIN_REPORTE', resource_type: u.tipo, unit_issi: u.id, unit_code: u.codigo, jurisdiction: u.jur, lat: u.lat, lng: u.lng, message: `${nombre} dejó de reportar ${u.tipo === 'MOVIL' ? 'GPS ' : ''}hace ${u.min} min` });
     }
-    this.enLineaAntes = enLineaAhora;
 
     for (const m of moviles) {
       const key = `MOVIL:${m.issi}`;
@@ -172,19 +180,18 @@ export class AlertasService implements OnModuleInit, OnModuleDestroy {
         this.fueraJur.delete(key);
         continue;
       }
-      // Detenida fuera de una parada
+      // Detenida fuera de una parada de su ruta (solo móviles con ruta del turno y sin despacho)
+      const plan = planPorMovil.get(m.issi);
       const q = this.quietas.get(key);
       if (!q || haversineM(q, m as any) > MOVIMIENTO_M) this.quietas.set(key, { lat: m.lat, lng: m.lng, desde: ahora });
-      else if (!m.despacho_abierto) {
+      else if (plan && !m.despacho_abierto) {
         const min = Math.round((ahora - q.desde) / 60000);
-        const plan = planPorMovil.get(m.issi);
-        const enParada = plan?.stops.some((s) => haversineM(s, m as any) <= RADIO_PARADA_M);
+        const enParada = plan.stops.some((s) => haversineM(s, m as any) <= RADIO_PARADA_M);
         if (min >= DETENIDA_MIN && !enParada) {
-          out.push({ key: `DETENIDA:MOVIL:${m.issi}`, type: 'DETENIDA', resource_type: 'MOVIL', unit_issi: m.issi, unit_code: m.codigo, jurisdiction: m.jurisdiccion?.nombre, lat: m.lat, lng: m.lng, message: `${m.codigo} lleva ${min} min detenida fuera de una parada${plan ? ' de su ruta' : ''}` });
+          out.push({ key: `DETENIDA:MOVIL:${m.issi}`, type: 'DETENIDA', resource_type: 'MOVIL', unit_issi: m.issi, unit_code: m.codigo, jurisdiction: m.jurisdiccion?.nombre, lat: m.lat, lng: m.lng, message: `${m.codigo} lleva ${min} min detenida fuera de una parada de su ruta` });
         }
       }
       // Fuera de su jurisdicción (la de su ruta del turno), dos revisiones seguidas y sin despacho
-      const plan = planPorMovil.get(m.issi);
       if (plan?.jurisdiction_id && m.jurisdiccion && !m.jurisdiccion.aproximada && m.jurisdiccion.id !== plan.jurisdiction_id && !m.despacho_abierto) {
         const n = (this.fueraJur.get(key) ?? 0) + 1;
         this.fueraJur.set(key, n);
