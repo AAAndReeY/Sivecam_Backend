@@ -16,6 +16,7 @@ import {
 import { CustomRoleGuard, JwtAuthGuard, ModuleKey, ModuleOp } from '../auth/guard';
 import { DespachoService } from './despacho.service';
 import { AlertasService } from './alertas.service';
+import { SupervisionService } from './supervision.service';
 import { AsignarDto, CerrarDto, GenerarRutasDto, RutaManualDto, ServicioDto, TipoIncidenciaDto } from './dto';
 import { MovilesService } from './moviles.service';
 import { PatrullajeService } from './patrullaje.service';
@@ -41,6 +42,7 @@ export class PatrullajeController {
     private readonly patrullaje: PatrullajeService,
     private readonly moviles: MovilesService,
     private readonly alertas: AlertasService,
+    private readonly supervision: SupervisionService,
   ) {}
 
   @Get('estado')
@@ -59,10 +61,26 @@ export class PatrullajeController {
     return this.moviles.listarAPie();
   }
 
-  /** Recorrido reciente de una unidad para dibujarlo en el mapa. */
+  /** Recorrido de una unidad: últimas `horas` o un rango `desde`/`hasta` (ISO), para dibujarlo o reproducirlo. */
   @Get('recursos/:tipo/:id/recorrido')
-  recorrido(@Param('tipo') tipo: string, @Param('id') id: string, @Query('horas') horas?: string) {
-    return this.moviles.recorrido(tipoRecurso(tipo), id, num(horas, 2, 1, 24));
+  recorrido(
+    @Param('tipo') tipo: string,
+    @Param('id') id: string,
+    @Query('horas') horas?: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    const fin = hasta ? new Date(hasta) : new Date();
+    const ini = desde ? new Date(desde) : new Date(fin.getTime() - num(horas, 2, 1, 24) * 3600 * 1000);
+    if (Number.isNaN(ini.getTime()) || Number.isNaN(fin.getTime()) || fin <= ini) throw new BadRequestException('Rango de fechas inválido');
+    if (fin.getTime() - ini.getTime() > 48 * 3600 * 1000) throw new BadRequestException('El rango no puede pasar de 48 h');
+    return this.moviles.recorrido(tipoRecurso(tipo), id, ini, fin);
+  }
+
+  /** Cobertura real del turno: puntos GPS de las móviles con ruta (mapa de calor) y zonas de riesgo cubiertas. */
+  @Get('cobertura')
+  cobertura(@Query('fecha') fecha?: string, @Query('turno') turno?: string) {
+    return this.supervision.cobertura(fecha, parseShift(turno));
   }
 
   /** Fuera de servicio / volver al servicio, marcado por la torre. */
@@ -139,7 +157,22 @@ export class PatrullajeController {
 @ModuleKey('despacho')
 @Controller('despacho')
 export class DespachoController {
-  constructor(private readonly despacho: DespachoService) {}
+  constructor(
+    private readonly despacho: DespachoService,
+    private readonly supervision: SupervisionService,
+  ) {}
+
+  /** Indicadores de un turno (informe a la Subgerencia). */
+  @Get('indicadores')
+  indicadores(@Query('fecha') fecha?: string, @Query('turno') turno?: string) {
+    return this.supervision.indicadores(fecha, parseShift(turno));
+  }
+
+  /** Bitácora: quién despachó, canceló, cerró o cambió rutas. `incidencia` filtra por código o unidad. */
+  @Get('bitacora')
+  bitacora(@Query('horas') horas?: string, @Query('incidencia') incidencia?: string) {
+    return this.supervision.bitacora(num(horas, 24, 1, 24 * 31), incidencia);
+  }
 
   @Get('incidencias')
   incidencias(@Query('horas') horas?: string) {

@@ -80,9 +80,7 @@ export class MovilesService {
    * Recorrido reciente de una unidad (últimas `horas`): histórico GPS de Dolphin para radios,
    * ubicaciones de la API de bodycams para bodycams. Puntos [{ lat, lng, t, velocidad }] en orden cronológico.
    */
-  async recorrido(tipo: TipoRecurso, id: string, horas = 2) {
-    const hasta = new Date();
-    const desde = new Date(hasta.getTime() - horas * 3600 * 1000);
+  async recorrido(tipo: TipoRecurso, id: string, desde: Date, hasta: Date) {
     if (tipo === 'BODYCAM') {
       const r = await this.bodycams.findUbicaciones(id, desde.toISOString(), hasta.toISOString(), '5000');
       const rows: any[] = Array.isArray(r) ? r : r?.ubicaciones ?? r?.data ?? [];

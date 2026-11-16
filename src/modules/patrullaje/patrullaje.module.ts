@@ -9,6 +9,7 @@ import { MovilesService } from './moviles.service';
 import { DespachoController, PatrullajeController } from './patrullaje.controller';
 import { PatrullajeService } from './patrullaje.service';
 import { PrediccionClient } from './prediccion.client';
+import { SupervisionService } from './supervision.service';
 
 /**
  * Prueba piloto de MIT: rutas inteligentes por turno, rutas manuales y despacho asistido.
@@ -17,6 +18,6 @@ import { PrediccionClient } from './prediccion.client';
 @Module({
   imports: [GpsRadioModule, BodycamModule, AuditModule],
   controllers: [PatrullajeController, DespachoController],
-  providers: [PatrullajeService, DespachoService, MovilesService, PrediccionClient, CamarasService, AlertasService],
+  providers: [PatrullajeService, DespachoService, MovilesService, PrediccionClient, CamarasService, AlertasService, SupervisionService],
 })
 export class PatrullajeModule {}

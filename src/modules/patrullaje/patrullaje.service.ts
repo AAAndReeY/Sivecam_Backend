@@ -342,7 +342,24 @@ export class PatrullajeService {
     }
     const total = out.reduce((s, r) => s + (r.paradas ?? 0), 0);
     const visitadas = out.reduce((s, r) => s + (r.visitadas ?? 0), 0);
-    return { planes: out, paradas: total, visitadas, pct: total ? Math.round((100 * visitadas) / total) : null };
+    // Porcentaje por jurisdicción (para ver qué zona quedó descubierta) y por móvil
+    const porJur = new Map<string, { jurisdiccion: string; moviles: number; paradas: number; visitadas: number }>();
+    for (const r of out) {
+      const k = r.plan?.jurisdiction ?? 'Sin jurisdicción';
+      const e = porJur.get(k) ?? { jurisdiccion: k, moviles: 0, paradas: 0, visitadas: 0 };
+      e.moviles++;
+      e.paradas += r.paradas ?? 0;
+      e.visitadas += r.visitadas ?? 0;
+      porJur.set(k, e);
+    }
+    return {
+      planes: out,
+      paradas: total,
+      visitadas,
+      pct: total ? Math.round((100 * visitadas) / total) : null,
+      por_jurisdiccion: [...porJur.values()].map((e) => ({ ...e, pct: e.paradas ? Math.round((100 * e.visitadas) / e.paradas) : null })).sort((a, b) => a.jurisdiccion.localeCompare(b.jurisdiccion)),
+      por_movil: out.map((r) => ({ unidad: r.plan?.unit_code, jurisdiccion: r.plan?.jurisdiction, paradas: r.paradas ?? 0, visitadas: r.visitadas ?? 0, pct: r.pct ?? null, error: r.error ?? null })),
+    };
   }
 
   private resumenCumplimiento(plan: any, puntosGps: number, nota?: string, desde?: Date) {

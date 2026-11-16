@@ -63,10 +63,11 @@ export class ParadaManualDto {
   @IsLongitude()
   lng: number;
 
-  @IsOptional()
+  /** Nombre o motivo de la parada (dirección, zona de riesgo, operativo). Obligatorio. */
   @IsString()
+  @IsNotEmpty({ message: 'Cada parada necesita un nombre o motivo' })
   @MaxLength(300)
-  motivo?: string;
+  motivo: string;
 
   @IsOptional()
   @IsInt()
