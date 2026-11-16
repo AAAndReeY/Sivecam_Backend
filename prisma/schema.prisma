@@ -487,6 +487,37 @@ model Dispatch {
   @@index([group_id])
 }
 
+// "Fuera de servicio" marcado por la torre: la unidad no se sugiere ni recibe ruta hasta que vuelva.
+// key = "<MOVIL|RADIO|BODYCAM>:<issi o código>"
+model UnitServiceStatus {
+  key             String   @id
+  fuera_servicio  Boolean  @default(true)
+  motivo          String?
+  updated_by      String?
+  updated_at      DateTime @updatedAt
+}
+
+// Alertas automáticas del turno (unidad detenida, fuera de su jurisdicción, dejó de reportar, jurisdicción sin móvil).
+// Se abren y cierran solas; la torre puede marcarlas como atendidas. Quedan como historial.
+model PatrolAlert {
+  id              String    @id @default(uuid())
+  type            String              // DETENIDA | FUERA_JURISDICCION | SIN_REPORTE | JURISDICCION_SIN_MOVIL
+  resource_type   String?             // MOVIL | RADIO | BODYCAM (null para jurisdicción)
+  unit_issi       String?
+  unit_code       String?
+  jurisdiction    String?
+  lat             Float?
+  lng             Float?
+  message         String
+  started_at      DateTime  @default(now())
+  ended_at        DateTime?
+  acknowledged_by String?
+  acknowledged_at DateTime?
+
+  @@index([ended_at])
+  @@index([started_at])
+}
+
 // Prioridad y nombre corto por tipo de incidencia (configurable desde Despacho). Si un tipo no está aquí,
 // se usa la regla por defecto de tipos-incidencia.ts (según el grupo del motor predictivo).
 model IncidentTypeConfig {
