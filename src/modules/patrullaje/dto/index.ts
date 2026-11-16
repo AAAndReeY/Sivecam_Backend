@@ -238,3 +238,14 @@ export class TipoIncidenciaDto {
   @IsIn(CATEGORIAS)
   categoria?: Categoria;
 }
+
+export class ServicioDto {
+  @IsBoolean()
+  fuera_servicio: boolean;
+
+  /** Taller, sin combustible, sin personal, etc. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  motivo?: string;
+}

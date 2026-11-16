@@ -4,6 +4,7 @@ import { GpsRadioService } from '../gps-radio/gps-radio.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { haversineM, parseDolphinDate } from './geo.util';
 import { PrediccionClient } from './prediccion.client';
+import { formatoLima } from './turnos.util';
 
 // La clase de cada radio (CAMIONETA / MOTO / A_PIE) la calcula GpsRadioService: tipo de Dolphin
 // o, si existe, la asignación local hecha en SIVECAM (Gestión de Radios GPS > Asignar a móvil).
@@ -26,6 +27,9 @@ export interface Recurso {
   minutos_sin_reporte: number | null;
   en_linea: boolean;
   despacho_abierto: string | null;
+  // Marcado por la torre: no se sugiere ni recibe ruta hasta que vuelva al servicio
+  fuera_servicio: boolean;
+  fuera_servicio_motivo: string | null;
 }
 
 export interface Movil extends Recurso {
@@ -60,9 +64,43 @@ export class MovilesService {
     return new Map(abiertos.map((d) => [`${d.resource_type}:${d.unit_issi}`, d.id]));
   }
 
+  private async fueraDeServicio() {
+    const rows = await this.prisma.unitServiceStatus.findMany({ where: { fuera_servicio: true } });
+    return new Map(rows.map((r) => [r.key, r.motivo ?? '']));
+  }
+
+  /** Marca o quita "fuera de servicio" (taller, sin combustible, sin personal, etc.). */
+  async marcarServicio(tipo: TipoRecurso, id: string, fuera: boolean, motivo?: string, usuario?: string) {
+    const key = `${tipo}:${id}`;
+    const data = { fuera_servicio: fuera, motivo: fuera ? motivo?.trim() || null : null, updated_by: usuario };
+    return this.prisma.unitServiceStatus.upsert({ where: { key }, create: { key, ...data }, update: data });
+  }
+
+  /**
+   * Recorrido reciente de una unidad (últimas `horas`): histórico GPS de Dolphin para radios,
+   * ubicaciones de la API de bodycams para bodycams. Puntos [{ lat, lng, t, velocidad }] en orden cronológico.
+   */
+  async recorrido(tipo: TipoRecurso, id: string, horas = 2) {
+    const hasta = new Date();
+    const desde = new Date(hasta.getTime() - horas * 3600 * 1000);
+    if (tipo === 'BODYCAM') {
+      const r = await this.bodycams.findUbicaciones(id, desde.toISOString(), hasta.toISOString(), '5000');
+      const rows: any[] = Array.isArray(r) ? r : r?.ubicaciones ?? r?.data ?? [];
+      return rows
+        .map((u) => ({ lat: Number(u.latitud ?? u.lat), lng: Number(u.longitud ?? u.lng ?? u.lon), t: new Date(u.fecha ?? u.timestamp ?? u.created_at), velocidad: null as number | null }))
+        .filter((u) => coordValida(u.lat, u.lng) && !Number.isNaN(u.t.getTime()))
+        .sort((a, b) => a.t.getTime() - b.t.getTime());
+    }
+    const [fd, hd] = formatoLima(desde).split(' ');
+    const [fh, hh] = formatoLima(hasta).split(' ');
+    return (await this.gps.findHistorico(id, fd, hd, fh, hh))
+      .map((p: any) => ({ lat: Number(p.latitud), lng: Number(p.longitud), t: parseDolphinDate(p.fechaHora), velocidad: Number(p.velocidad) || 0 }))
+      .filter((p) => p.t && coordValida(p.lat, p.lng)) as { lat: number; lng: number; t: Date; velocidad: number | null }[];
+  }
+
   // ─── Móviles (radio TETRA fija en el vehículo) ─────────────────────────────
   async listar(): Promise<Movil[]> {
-    const [radios, abiertos] = await Promise.all([this.gps.findAllIncludingOffline(), this.despachosAbiertos()]);
+    const [radios, abiertos, fuera] = await Promise.all([this.gps.findAllIncludingOffline(), this.despachosAbiertos(), this.fueraDeServicio()]);
     const ahora = Date.now();
     const out: Movil[] = [];
     for (const r of radios) {
@@ -87,14 +125,17 @@ export class MovilesService {
         minutos_sin_reporte: minutos,
         en_linea: valida && minutos !== null && minutos <= MINUTOS_EN_LINEA,
         despacho_abierto: abiertos.get(`MOVIL:${issi}`) ?? null,
+        fuera_servicio: fuera.has(`MOVIL:${issi}`),
+        fuera_servicio_motivo: fuera.get(`MOVIL:${issi}`) ?? null,
         jurisdiccion: lat != null && lng != null ? await this.prediccion.jurisdiccionDe({ lat, lng }) : null,
       });
     }
     return out.sort((a, b) => (a.minutos_sin_reporte ?? 1e12) - (b.minutos_sin_reporte ?? 1e12));
   }
 
+  /** Móviles con GPS reciente y en servicio: las únicas que se sugieren y reciben ruta. */
   async enLinea(): Promise<(Movil & { lat: number; lng: number })[]> {
-    return (await this.listar()).filter((m) => m.en_linea) as any;
+    return (await this.listar()).filter((m) => m.en_linea && !m.fuera_servicio) as any;
   }
 
   async buscar(issi: string): Promise<Movil | undefined> {
@@ -104,13 +145,14 @@ export class MovilesService {
   // ─── Personal a pie: radios portátiles (Dolphin) y bodycams ───────────────
   async listarAPie(): Promise<Recurso[]> {
     const ahora = Date.now();
-    const [radios, cams, abiertos] = await Promise.all([
+    const [radios, cams, abiertos, fuera] = await Promise.all([
       this.gps.findAllIncludingOffline(),
       this.bodycams.findAll().catch((e) => {
         this.logger.warn(`Bodycams no disponibles: ${e?.message}`);
         return [] as any[];
       }),
       this.despachosAbiertos(),
+      this.fueraDeServicio(),
     ]);
     const out: Recurso[] = [];
     for (const r of radios) {
@@ -130,6 +172,8 @@ export class MovilesService {
         minutos_sin_reporte: minutos,
         en_linea: valida && minutos !== null && minutos <= MINUTOS_EN_LINEA,
         despacho_abierto: abiertos.get(`RADIO:${issi}`) ?? null,
+        fuera_servicio: fuera.has(`RADIO:${issi}`),
+        fuera_servicio_motivo: fuera.get(`RADIO:${issi}`) ?? null,
       });
     }
     for (const b of cams) {
@@ -149,6 +193,8 @@ export class MovilesService {
         minutos_sin_reporte: minutos,
         en_linea: valida && minutos !== null && minutos <= MINUTOS_EN_LINEA,
         despacho_abierto: abiertos.get(`BODYCAM:${id}`) ?? null,
+        fuera_servicio: fuera.has(`BODYCAM:${id}`),
+        fuera_servicio_motivo: fuera.get(`BODYCAM:${id}`) ?? null,
       });
     }
     return out;
@@ -166,7 +212,7 @@ export class MovilesService {
    */
   async aPieCerca(p: { lat: number; lng: number }, radioM: number) {
     const cerca = (await this.listarAPie())
-      .filter((r) => r.en_linea && r.lat != null && r.lng != null)
+      .filter((r) => r.en_linea && !r.fuera_servicio && r.lat != null && r.lng != null)
       .map((r) => ({ ...r, recta_m: Math.round(haversineM(p, r as any)) }))
       .filter((r) => r.recta_m <= radioM)
       .sort((a, b) => a.recta_m - b.recta_m);

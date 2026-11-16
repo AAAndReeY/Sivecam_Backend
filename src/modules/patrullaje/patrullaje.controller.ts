@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -14,10 +15,17 @@ import {
 } from '@nestjs/common';
 import { CustomRoleGuard, JwtAuthGuard, ModuleKey, ModuleOp } from '../auth/guard';
 import { DespachoService } from './despacho.service';
-import { AsignarDto, CerrarDto, GenerarRutasDto, RutaManualDto, TipoIncidenciaDto } from './dto';
+import { AlertasService } from './alertas.service';
+import { AsignarDto, CerrarDto, GenerarRutasDto, RutaManualDto, ServicioDto, TipoIncidenciaDto } from './dto';
 import { MovilesService } from './moviles.service';
 import { PatrullajeService } from './patrullaje.service';
 import { parseShift } from './turnos.util';
+
+const tipoRecurso = (v: string) => {
+  const t = String(v ?? '').toUpperCase();
+  if (t !== 'MOVIL' && t !== 'RADIO' && t !== 'BODYCAM') throw new BadRequestException('tipo debe ser MOVIL, RADIO o BODYCAM');
+  return t as 'MOVIL' | 'RADIO' | 'BODYCAM';
+};
 
 const num = (v: string | undefined, def: number, min: number, max: number) => {
   const n = Number(v);
@@ -32,6 +40,7 @@ export class PatrullajeController {
   constructor(
     private readonly patrullaje: PatrullajeService,
     private readonly moviles: MovilesService,
+    private readonly alertas: AlertasService,
   ) {}
 
   @Get('estado')
@@ -42,6 +51,40 @@ export class PatrullajeController {
   @Get('moviles')
   listarMoviles() {
     return this.moviles.listar();
+  }
+
+  /** Personal a pie (radios portátiles y bodycams) para el tablero y el buscador. */
+  @Get('a-pie')
+  listarAPie() {
+    return this.moviles.listarAPie();
+  }
+
+  /** Recorrido reciente de una unidad para dibujarlo en el mapa. */
+  @Get('recursos/:tipo/:id/recorrido')
+  recorrido(@Param('tipo') tipo: string, @Param('id') id: string, @Query('horas') horas?: string) {
+    return this.moviles.recorrido(tipoRecurso(tipo), id, num(horas, 2, 1, 24));
+  }
+
+  /** Fuera de servicio / volver al servicio, marcado por la torre. */
+  @ModuleOp('edit')
+  @Patch('recursos/:tipo/:id/servicio')
+  async servicio(@Param('tipo') tipo: string, @Param('id') id: string, @Body() dto: ServicioDto, @Req() req: any) {
+    const t = tipoRecurso(tipo);
+    const r = await this.moviles.marcarServicio(t, id, dto.fuera_servicio, dto.motivo, req.user?.username);
+    await this.alertas.auditar(dto.fuera_servicio ? 'FUERA_DE_SERVICIO' : 'VUELVE_AL_SERVICIO', `${t}:${id}`, { motivo: dto.motivo }, req.user?.username);
+    return r;
+  }
+
+  /** Alertas automáticas: activas e historial de las últimas horas. */
+  @Get('alertas')
+  listarAlertas(@Query('horas') horas?: string) {
+    return this.alertas.listar(num(horas, 24, 1, 24 * 7));
+  }
+
+  @ModuleOp('edit')
+  @Patch('alertas/:id/atender')
+  atenderAlerta(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
+    return this.alertas.atender(id, req.user?.username);
   }
 
   /** Zonas de riesgo del turno: `top` por cada jurisdicción. */
